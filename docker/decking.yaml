@@ -1,0 +1,38 @@
+# Images decking should create. Use these labels for the 'decking build'
+# command, or use 'all' to run all of them.
+images:
+  "bd4c/deb_proxy":        "./img/deb_proxy"
+  "bd4c/baseimage":        "./img/baseimage"
+  "bd4c/hadoop_base":      "./img/hadoop_base"
+
+# Containers to define. Options here correspond to common 'docker run' options.
+containers:
+  # These containers have a directory given in "images" above, so they are built
+  # locally from the corresponding Dockerfile
+  deb_proxy:
+    # # name of the image to use
+    image:        bd4c/deb_proxy
+    port:         ["10000:10000"]
+    mount:        ["/tmp/deb_proxy:/bulk/deb_proxy"]
+
+  baseimage:
+    image:        bd4c/baseimage
+
+  hadoop_base:
+    image:        bd4c/hadoop_base
+
+clusters:
+  proxy:
+    - deb_proxy
+  dev:
+    # - baseimage
+    - hadoop_base
+
+groups:
+  proxy:
+    containers:
+      deb_proxy:    { port: ["10022:22","10000:10000"] }
+  dev:
+    containers:
+      # baseimage:    { port: ["10122:22"] }
+      hadoop_base:  { port: ["10222:22"] }

@@ -1,0 +1,23 @@
+
+namespace :docker do
+  task :rm_stopped do
+    args = `docker ps -a  | egrep -v ' Up |CONTAINER ID' | cut -c 1-12`.gsub(/[\r\n]/, " ")
+    if args.empty?
+      puts "No stopped containers to kill"
+    else
+      sh "docker rm #{args} ; true"
+    end
+  end
+
+  task :rmi_all do
+    sh "docker rmi $(docker images | grep '^<none>' | awk '{print $3}')"
+  end
+
+  task :df do
+    sh "boot2docker ssh df -m /mnt/sda1/var/lib/docker/aufs"
+  end
+
+  task :ps do
+    sh "docker ps -a"
+  end
+end
