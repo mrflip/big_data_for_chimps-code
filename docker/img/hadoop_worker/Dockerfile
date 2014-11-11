@@ -16,17 +16,37 @@ EXPOSE 8041
 
 COPY img/hadoop_base/conf/core-site.xml.mustache   $HADOOP_CONF_DIR/
 COPY img/hadoop_base/conf/hdfs-site.xml.mustache   $HADOOP_CONF_DIR/
+COPY img/hadoop_base/conf/yarn-site.xml.mustache   $HADOOP_CONF_DIR/
+COPY img/hadoop_base/conf/mapred-site.xml.mustache $HADOOP_CONF_DIR/
+
+# ---------------------------------------------------------------------------
+#
+# Install and configure the datanode daemon
+#
+COPY img/hadoop_worker/hadoop-setup_dn.sh /build/
+RUN             /build/hadoop-setup_dn.sh
+
+COPY img/hadoop_worker/runit/hadoop_dn-runner.sh /etc/sv/hadoop_dn/run
+COPY img/hadoop_worker/runit/hadoop_dn-logger.sh /etc/sv/hadoop_dn/log/run
+
+# ---------------------------------------------------------------------------
+#
+# Install and configure the nodemanager daemon
+#
+COPY img/hadoop_worker/hadoop-setup_nm.sh /build/
+RUN             /build/hadoop-setup_nm.sh
+
+COPY img/hadoop_worker/runit/hadoop_nm-runner.sh /etc/sv/hadoop_nm/run
+COPY img/hadoop_worker/runit/hadoop_nm-logger.sh /etc/sv/hadoop_nm/log/run
+
+# ---------------------------------------------------------------------------
+#
+# Install and configure the datanode daemon
+#
 
 RUN /etc/my_init.d/50_hadoop_mustache_rider.sh ; \
     colordiff -uw $HADOOP_CONF_DIR/hdfs-site.xml.mustache $HADOOP_CONF_DIR/hdfs-site.xml ; \
     colordiff -uw $HADOOP_CONF_DIR/core-site.xml.mustache $HADOOP_CONF_DIR/core-site.xml ; \
     true
-
-# Install and configure the datanode daemon
-#
-COPY img/hadoop_worker/hadoop-setup_dn.sh /build/
-RUN         /build/hadoop-setup_dn.sh
-
-COPY img/hadoop_worker/runit/hadoop_dn-runner.sh /etc/sv/hadoop_dn/run
-COPY img/hadoop_worker/runit/hadoop_dn-logger.sh /etc/sv/hadoop_dn/log/run
-# RUN ln -s /etc/sv/hadoop_dn /etc/service/hadoop_dn
+RUN ln -s /etc/sv/hadoop_dn /etc/service/hadoop_dn
+# RUN ln -s /etc/sv/hadoop_nm /etc/service/hadoop_nm

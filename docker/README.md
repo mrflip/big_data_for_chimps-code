@@ -63,3 +63,21 @@ https://docs.docker.com/articles/dockerfile_best-practices/
 
 
 debian:wheezy
+
+### More notes
+
+Failed experiment:
+
+```
+  # docker run -d -p 172.17.42.1:53:53/udp --name skydns crosbymichael/skydns -nameserver 8.8.8.8:53 -domain docker
+  skydns:
+    image:        "crosbymichael/skydns"
+    port:         ["172.17.42.1:53:53/udp"]
+    extra:        "-nameserver 8.8.8.8:53 -domain bd4c"
+  #
+  # docker run -d -v /var/run/docker.sock:/docker.sock --name skydock crosbymichael/skydock -ttl 30 -environment dev -s /docker.sock -domain docker -name skydns
+  skydock:
+    image:        "crosbymichael/skydock"
+    mount:        ["/var/run/docker.sock:/docker.sock"]
+    extra:        "-ttl 30 -environment dev -s /docker.sock -domain docker -name skydns"
+```

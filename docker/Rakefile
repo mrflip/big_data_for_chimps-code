@@ -42,6 +42,24 @@ class DockerImage
   end
 end
 
+# The hadoop ports that might potentially be interesting
+HADOOP_PORTS = {
+  8042 => 'nm-console', 50075 => 'dn-console', 8010 => 'dn-jmx',
+  8888 => 'hue', 8088 => 'rm-console', 19888 => 'hist-server', 50070 => 'nn-console' }
+# open ssh ports at 9022, 9122, 9222, etc
+SSH_PORTS = {
+  9022 => 'foyer-ssh', 9122 => 'worker-ssh', 9222 => 'hue-ssh', 9322 => 'rm-ssh', 9422 => 'nn-ssh',
+  9522 => 'snn-ssh',   9622 => nil, 10022 => 'deb-proxy-ssh', 10122 => nil, }
+OTHER_PORTS  = { 10000 => 'deb-proxy' }
+
+def forward_ports(ports)
+  ports.each do |port, name|
+    name ||= "tcp-port#{port}"
+    sh "VBoxManage modifyvm boot2docker-vm --natpf1 '#{name},tcp,,#{port},,#{port}' ; true"
+    sh "VBoxManage modifyvm boot2docker-vm --natpf1 '#{name},udp,,#{port},,#{port}' ; true"
+  end
+end
+
 namespace :docker do
   task :rm_stopped do
     args = `docker ps -a  | egrep -v ' Up |CONTAINER ID' | cut -c 1-12`.gsub(/[\r\n]/, " ")
@@ -76,4 +94,11 @@ namespace :docker do
     images = lines.each_with_index.map{|line, idx| DockerImage.from_history(line, idx) }
     images.sort_by(&:name).each{|image| puts image.to_s }
   end
+
+  task :open_ports do
+    forward_ports(HADOOP_PORTS)
+    forward_ports(SSH_PORTS)
+    forward_ports(OTHER_PORTS)
+  end
+
 end

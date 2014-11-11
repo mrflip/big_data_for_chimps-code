@@ -8,25 +8,16 @@ EXPOSE 8020
 COPY img/hadoop_base/conf/core-site.xml.mustache   $HADOOP_CONF_DIR/
 COPY img/hadoop_base/conf/hdfs-site.xml.mustache   $HADOOP_CONF_DIR/
 
-# force templating so that we can format the namenode
 RUN /etc/my_init.d/50_hadoop_mustache_rider.sh ; \
     colordiff -uw $HADOOP_CONF_DIR/hdfs-site.xml.mustache $HADOOP_CONF_DIR/hdfs-site.xml ; \
     colordiff -uw $HADOOP_CONF_DIR/core-site.xml.mustache $HADOOP_CONF_DIR/core-site.xml ; \
     true
 
-# Install and configure the namenode daemon
+# Install and configure the resource manager daemon
 #
-COPY img/hadoop_nn/hadoop-setup_nn.sh /build/
-RUN         /build/hadoop-setup_nn.sh
+COPY img/hadoop_snn/hadoop-setup_snn.sh /build/
+RUN         /build/hadoop-setup_snn.sh
 
-# Format the HDFS
-#
-RUN  sudo -u hdfs hdfs namenode -format
-
-RUN ls -lR  /bulk/perm/hadoop/
-
-# Install and enable the namenode daemon
-#
-COPY img/hadoop_nn/runit/hadoop_nn-runner.sh /etc/sv/hadoop_nn/run
-COPY img/hadoop_nn/runit/hadoop_nn-logger.sh /etc/sv/hadoop_nn/log/run
-RUN  ln -s /etc/sv/hadoop_nn /etc/service/hadoop_nn
+COPY img/hadoop_snn/runit/hadoop_snn-runner.sh /etc/sv/hadoop_snn/run
+COPY img/hadoop_snn/runit/hadoop_snn-logger.sh /etc/sv/hadoop_snn/log/run
+RUN ln -s /etc/sv/hadoop_snn /etc/service/hadoop_snn

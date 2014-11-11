@@ -18,5 +18,5 @@ for file in core-site.xml mapred-site.xml yarn-site.xml hdfs-site.xml ; do
   fi
 done
 
-echo "Gave configuration a mustache ride on `date`" >> $HADOOP_LOG_DIR/config_mustache.log 
+echo "Gave configuration a mustache ride on `date`" >> $HADOOP_CONF_DIR/mustache_rider.log 
 
