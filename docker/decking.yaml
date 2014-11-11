@@ -4,35 +4,118 @@ images:
   "bd4c/deb_proxy":        "./img/deb_proxy"
   "bd4c/baseimage":        "./img/baseimage"
   "bd4c/hadoop_base":      "./img/hadoop_base"
-
+  "bd4c/hadoop_nn":        "./img/hadoop_nn"
+  "bd4c/hadoop_worker":    "./img/hadoop_worker"
+  # "bd4c/hadoop_base":      "./img/hadoop_base"
+  # "bd4c/hadoop_base":      "./img/hadoop_base"
+    
 # Containers to define. Options here correspond to common 'docker run' options.
 containers:
+  host_filer:
+    image:       "blalor/docker-hosts"
+    extra:       ["/srv/hosts"]
+    mount:
+      - "/var/lib/docker/hosts:/srv/hosts"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  # docker run -d -p 172.17.42.1:53:53/udp --name skydns crosbymichael/skydns -nameserver 8.8.8.8:53 -domain docker
+  # docker run -d -v /var/run/docker.sock:/docker.sock --name skydock crosbymichael/skydock -ttl 30 -environment dev -s /docker.sock -domain docker -name skydns
+
+  skydns:
+    image:        "crosbymichael/skydns"
+    port:         ["53:53/udp"]
+    
+    
+    
+      
   # These containers have a directory given in "images" above, so they are built
   # locally from the corresponding Dockerfile
   deb_proxy:
     # # name of the image to use
-    image:        bd4c/deb_proxy
+    image:        "bd4c/deb_proxy"
     port:         ["10000:10000"]
     mount:        ["/tmp/deb_proxy:/bulk/deb_proxy"]
 
-  baseimage:
-    image:        bd4c/baseimage
+  baseimage:      "bd4c/baseimage"
 
   hadoop_base:
+    image:        "bd4c/hadoop_base"
+    port:         [ "11222:22" ]
+  
+  hadoop_foyer:
+    image:        "bd4c/hadoop_base"
+    port:         [ "9022:22", "8888:8888" ]
+    hostname:     "hue"
+    dependencies:
+      - "hadoop_nn:nn"
+
+  hadoop_worker:
+    image:        bd4c/hadoop_worker
+    # node mgr:  console http 8042 / https 8044, localizer 8040, ipc 8041, ganglia 8660
+    # data node: console http 50075 / https 50475, ipc 50020, xceiver 50010, jmx 8010
+    port:         [ "9122:22", 8042, 8044, 8040, 8041, 50075, 50475, 50020, 50010, 8010 ]
+    dependencies:
+      - "hadoop_nn:nn"
+      # - "hadoop_rm:rm"
+
+  hadoop_hue:
     image:        bd4c/hadoop_base
+    # http 8888
+    port:         [ "9222:22", "8888:8888" ]
+    hostname:     "hue"
+
+  hadoop_rm:
+    image:        bd4c/hadoop_base
+    # rsrc mgr: console http 8088 / https 8090; scheduler 8030;
+    #           tracker 8031; ipc 8032; admin 8033; ganglia 8660, shuffle 13562;
+    # history:  console 19888 / https 19890, ipc 10020, admin 1033
+    port:         [ "9322:22", "8088:8088", "8090:8090", "8030:8030", "8031:8031", "8032:8032", "8033:8033", "19888:19888", "19890:19890", "10020:10020", "10033:10033", "13562:13562" ]
+    hostname:     "rm"
+    
+  hadoop_nn:
+    image:        bd4c/hadoop_nn
+    # console http 50070 / https 50470; ipc 8020/9000; ganglia 8660
+    port:         [ "9422:22", "50070:50070", "50470:50470", "8020:8020", "9000:9000" ]
+    hostname:     "nn"
+    mount:
+      - "/var/lib/docker/hosts:/etc/hosts:ro"
+    
+  hadoop_snn:
+    image:        bd4c/hadoop_base
+    # checkpoint api http 50090 / https 50495 ; ganglia 8660
+    port:         [ "9522:22", 50090, 50495 ]
+    hostname:     "snn"
+    dependencies:
+      - "hadoop_nn:nn"
+
+  # hadoop_zk:
+  #   image:        bd4c/hadoop_base
+  #   # client 2181, ipc 2888, election 3888, JMX 9010, failover 8019
+  #   port:         [ "9622:22", 2181, 2888, 3888, 2888 ]
+
+  # Httpfs admin 14001, rest 14000
+  # journal node 8480, 8485,
+  # nfs gateway gateway 2049, mountd 4242, portmap 111
+  # failover controller: 8018
 
 clusters:
   proxy:
     - deb_proxy
+  helper:
+    - host_filer
   dev:
     # - baseimage
     - hadoop_base
+    - hadoop_nn
+    - hadoop_worker
 
 groups:
-  proxy:
+  helper:
     containers:
-      deb_proxy:    { port: ["10022:22","10000:10000"] }
-  dev:
-    containers:
-      # baseimage:    { port: ["10122:22"] }
-      hadoop_base:  { port: ["10222:22"] }
+      deb_proxy:        { port: ["10022:22","10000:10000"] }
+  # dev:
+  #   containers:
+  #     # baseimage:        { port: ["10122:22"] }
+  #     # hadoop_base:        { }
+  #     # hadoop_nn:        { }
+  #     # hadoop_worker:    { }

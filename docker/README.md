@@ -1,5 +1,10 @@
 
 
+```
+tail -F -n 10000 /bulk/log/hadoop/namenode-daemon/current
+```
+
+
 ### Runnable
 
 ```

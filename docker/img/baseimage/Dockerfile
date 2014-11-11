@@ -28,23 +28,25 @@ RUN                                                               \
 RUN /usr/sbin/enable_insecure_key && /etc/my_init.d/00_regen_ssh_host_keys.sh
 
 # Basics so we can use the deb-proxy cache
-COPY /img/baseimage/build/setup-deb_proxy.sh /build/setup-deb_proxy.sh
-RUN /build/setup-deb_proxy.sh
+COPY /img/baseimage/setup-deb_proxy.sh     /build/
+RUN          /build/setup-deb_proxy.sh
 
 # Add the apt repos we will use
-COPY /img/baseimage/build/setup-add_apt_repos.sh /build/setup-add_apt_repos.sh
-RUN /build/setup-add_apt_repos.sh
+COPY /img/baseimage/setup-add_apt_repos.sh /build/
+RUN          /build/setup-add_apt_repos.sh
 
-# Set up Java
-COPY /img/baseimage/build/setup-java.sh /build/setup-java.sh
-RUN /build/setup-java.sh
-
+# Install and configure Java
+COPY /img/baseimage/setup-java.sh          /build/
+RUN          /build/setup-java.sh
 ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
 ENV PATH      $PATH:$JAVA_HOME/bin
 
-# Add some developer conveniences
-COPY /img/baseimage/build/setup-add_conveniences.sh /build/setup-add_conveniences.sh
-RUN /build/setup-add_conveniences.sh
+# Install some developer conveniences
+COPY /img/baseimage/setup-add_conveniences.sh /build/
+RUN          /build/setup-add_conveniences.sh
 
+# Finish configuration
+COPY /img/baseimage/setup-other_configuration.sh /build/
+RUN          /build/setup-other_configuration.sh
 
 CMD ["/sbin/my_init"]

@@ -6,23 +6,24 @@ set -e ; set -x
 # Developer Conveniences
 #
 
-echo "**********" ; du --exclude=proc -smc /
+echo "======== begin " ;
+
+du --exclude=proc -smc / ; echo "======== basics " ; 
 
 # commandline tools we want on any machine we'll have to debug (~ 46MB)
 $safe_apt_install                                         \
   aptitude colordiff elinks git host less locate man nano \
   sudo tar tree unzip vim wget zip 
 
-
 ## The rest of this we can kick to the client install later
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== build"
 
 # for building packages (~96 MB)
 $safe_apt_install                                                 \
   build-essential autoconf automake1.9 libtool make gcc
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== libs"
 
 # libs (~ 25 MB)
 $safe_apt_install                                                 \
@@ -30,27 +31,27 @@ $safe_apt_install                                                 \
   libssl-dev  libxml2-dev libxml2-dev libxml2-utils libxslt-dev   \
   libxslt1-dev libxslt1-dev libyaml-dev libyaml-dev zlib1g-dev
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== diagnostics*"
 
 # diagnostics (~ 25 MB)
 $safe_apt_install dstat htop ifstat netcat-openbsd nmap openssl rsync
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== python"
 
 # python (~ 80MB)
 $safe_apt_install python3 python3-dev python-dev python-setuptools
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== emacs"
 
 # emacs (~ 80MB)
 $safe_apt_install emacs23-nox
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== node"
 
 # node (~ 8 MB)
 $safe_apt_install nodejs
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== ruby"
 
 # ruby (~ 27 MB)
 $safe_apt_install ruby2.0
@@ -71,4 +72,8 @@ gem2.0 install rake bundler --no-rdoc --no-ri
 sed -i 's|/usr/bin/env ruby.*$|/usr/bin/env ruby|; s|/usr/bin/ruby.*$|/usr/bin/env ruby|' \
 	/usr/local/bin/rake /usr/local/bin/bundle /usr/local/bin/bundler
 
-echo "**********" ; du --exclude=proc -smc /
+du --exclude=proc -smc / ; echo "======== apt-get clean"
+
+apt-get clean
+
+du --exclude=proc -smc / ; echo "======== done"

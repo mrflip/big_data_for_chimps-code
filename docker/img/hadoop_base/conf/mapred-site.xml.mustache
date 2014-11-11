@@ -4,15 +4,14 @@
   
   <!-- Directories -->
 
-  <property> <name>mapreduce.jobtracker.persist.jobstatus.dir</name>        <value>%HADOOP_BULK_DIR/jobstatus</value>          <description>Location to store job status information</description> </property>
-  <property> <name>mapreduce.cluster.local.dir</name>                       <value>%HADOOP_LOCL_DIR/mapred</value>             <description>Location(s) for intermediate data files. Must be local to the machine. Comma-separated.</description> </property>
-  <property><name>yarn.app.mapreduce.am.staging-dir</name>                  <value>%HADOOP_LOCL_DIR/yarn-staging</value>       </property> 
+  <property> <name>mapreduce.jobtracker.persist.jobstatus.dir</name>        <value>{{HADOOP_PERM_DIR}}/jobstatus</value>          <description>Location to store job status information</description> </property>
+  <property> <name>mapreduce.cluster.local.dir</name>                       <value>{{HADOOP_LOCL_DIR}}/mapred</value>             <description>Location(s) for intermediate data files. Must be local to the machine. Comma-separated.</description> </property>
+  <property><name>yarn.app.mapreduce.am.staging-dir</name>                  <value>{{HADOOP_LOCL_DIR}}/yarn-staging</value>       </property> 
 
   <!-- Hosts (Pseudo-mode) -->
   
-  <property> <name>mapred.job.tracker</name>				    <value>%HADOOP_JT_IP:8021</value>  </property>
-  <property> <name>mapreduce.jobhistory.address</name>			    <value>%HADOOP_HIST_IP:10020</value>  </property>
-  <property> <name>mapreduce.jobhistory.webapp.address</name>		    <value>%HADOOP_HIST_IP:19888</value>  </property>
+  <property> <name>mapreduce.jobhistory.address</name>			    <value>rm:10020</value>  </property>
+  <property> <name>mapreduce.jobhistory.webapp.address</name>		    <value>rm:19888</value>  </property>
 
   <!-- Map/Reduce -->
 

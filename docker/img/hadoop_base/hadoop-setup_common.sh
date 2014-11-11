@@ -9,7 +9,7 @@ echo "**********" ; du --exclude=proc -smc /
 #
 
 # Install, forcing use of the cloudera repos (so that ubuntu zookeeper isn't preferred)
-$safe_apt_install -t precise-cdh5.2 hadoop zookeeper zookeeper-native
+$safe_apt_install -t $HADOOP_APT_VERSION hadoop zookeeper zookeeper-native
 
 # ---------------------------------------------------------------------------
 #
@@ -17,11 +17,11 @@ $safe_apt_install -t precise-cdh5.2 hadoop zookeeper zookeeper-native
 #
 
 # Get our own set of conf files
-cp -rp  /etc/hadoop/conf.empty $HADOOP_CONF
+cp -rp  /etc/hadoop/conf.empty $HADOOP_CONF_DIR
 
 # Make those the default conf files
-update-alternatives --install /etc/hadoop/conf hadoop-conf $HADOOP_CONF 50
-update-alternatives --set                      hadoop-conf $HADOOP_CONF
+update-alternatives --install /etc/hadoop/conf hadoop-conf $HADOOP_CONF_DIR 50
+update-alternatives --set                      hadoop-conf $HADOOP_CONF_DIR
 
 # Make the Hadoop directories
 mkdir -p            $HADOOP_PERM_DIR $HADOOP_LOCL_DIR
