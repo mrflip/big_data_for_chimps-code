@@ -10,8 +10,8 @@
 
   <!-- Hosts (Pseudo-mode) -->
   
-  <property> <name>mapreduce.jobhistory.address</name>			    <value>rm:10020</value>  </property>
-  <property> <name>mapreduce.jobhistory.webapp.address</name>		    <value>rm:19888</value>  </property>
+  <property> <name>mapreduce.jobhistory.address</name>			    <value>{{HADOOP_RM_HOSTNAME}}:10020</value>  </property>
+  <property> <name>mapreduce.jobhistory.webapp.address</name>		    <value>{{HADOOP_RM_HOSTNAME}}:19888</value>  </property>
 
   <!-- Map/Reduce -->
 

@@ -33,5 +33,3 @@ RUN  ln -s /etc/sv/hadoop_nn /etc/service/hadoop_nn
 #
 COPY img/hadoop_nn/hadoop-bootstrap_hdfs.sh /build/
 RUN         /build/hadoop-bootstrap_hdfs.sh
-
-

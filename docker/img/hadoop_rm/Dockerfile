@@ -3,11 +3,20 @@ MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 
 # Ports
 #
-EXPOSE 50070
-EXPOSE 50470
-EXPOSE 8020
+# rsrc mgr: console http 8088 / https 8090; scheduler 8030;
+#           tracker 8031; ipc 8032; admin 8033; ganglia 8660, shuffle 13562;
+# history:  console 19888 / https 19890, ipc 10020, admin 1033
+EXPOSE 8088
+EXPOSE 8030
+EXPOSE 8031
+EXPOSE 8032
+EXPOSE 8033
+EXPOSE 13562
+EXPOSE 19888
+EXPOSE 10020
+EXPOSE 1033
 
-# Install and configure the resourcemanager
+# Install and configure the resourcemanager and historyserver
 #
 COPY img/hadoop_rm/hadoop-setup_rm.sh /build/
 RUN         /build/hadoop-setup_rm.sh
