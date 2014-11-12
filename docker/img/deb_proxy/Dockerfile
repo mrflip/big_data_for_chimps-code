@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.0
+FROM phusion/baseimage:0.9.15
 MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney; original by Panagiotis Moustafellos <pmoust@gmail.com>
 WORKDIR /root
 

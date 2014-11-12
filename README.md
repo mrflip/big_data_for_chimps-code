@@ -39,7 +39,7 @@ When you run `boot2docker up`, make sure that you have the env variable set -- f
 ### Pre-seed the base images
 
 ```
-docker pull phusion/baseimage:latest
+docker pull phusion/baseimage:0.9.15
 docker pull blalor/docker-hosts:latest
 ```
 

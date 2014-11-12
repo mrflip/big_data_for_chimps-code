@@ -47,6 +47,10 @@ namespace :docker do
   end
 
   task :helpers do
+    if not ENV['DOCKER_HOST']
+      warn "You don't seem to have a DOCKER_HOST environment variable set -- if the next commands fail, that's why."
+    end
+    puts "Got DOCKER_HOST of #{ENV['DOCKER_HOST']}"
     sh "decking build bd4c/deb_proxy"
     sh "decking create helpers"
     sh "decking start  helpers"
