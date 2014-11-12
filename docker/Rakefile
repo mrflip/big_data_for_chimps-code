@@ -1,4 +1,3 @@
-
 HADOOP_IMAGES = %w[ bd4c/baseimage bd4c/hadoop_base bd4c/hadoop_nn bd4c/hadoop_rm bd4c/hadoop_snn bd4c/hadoop_worker ]
 
 namespace :cluster do

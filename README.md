@@ -14,10 +14,14 @@ Clusters are defined using [decking](http://decking.io), a Node.js tool to creat
 
 ### Install decking
 
-Install :
+
+
+Install:
 
 ```
-( cd vendor/decking && npm install -g decking )
+git submodule init
+git submodule update
+( cd vendor/decking && npm install -g )
 ```
 
 You must use that version -- others will not work (lack hostname option)
@@ -43,12 +47,6 @@ docker pull phusion/baseimage:0.9.15
 docker pull blalor/docker-hosts:latest
 ```
 
-### Start the helper cluster
-
-```
-rake docker:helpers
-```
-
 ### Minor setup needed on the docker host
 
 ```
@@ -57,6 +55,12 @@ mkdir -p /tmp/deb_proxy /tmp/bulk/hadoop
 touch		    /var/lib/docker/hosts
 chmod 0644	    /var/lib/docker/hosts
 chown nobody:nobody /var/lib/docker/hosts
+```
+
+### Start the helper cluster
+
+```
+rake docker:helpers
 ```
 
 ### Build the images

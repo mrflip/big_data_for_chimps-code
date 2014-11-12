@@ -97,7 +97,7 @@ containers:
   # Failover    -- 8018
 
 clusters:
-  helper:
+  helpers:
     - host_filer
     - deb_proxy
   dev:
@@ -109,7 +109,7 @@ clusters:
     - hadoop_worker
 
 groups:
-  helper:
+  helpers:
     containers:
       deb_proxy:        { port: ["10022:22","10000:10000"] }
   # dev:
