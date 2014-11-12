@@ -49,19 +49,31 @@ docker pull blalor/docker-hosts:latest
 
 ### Minor setup needed on the docker host
 
+On the docker host (`boot2docker ssh`, or whatever else it takes):
+
 ```
-boot2docker ssh
+boot2docker ssh # if you're on OSX
 mkdir -p /tmp/deb_proxy /tmp/bulk/hadoop
-touch		    /var/lib/docker/hosts
-chmod 0644	    /var/lib/docker/hosts
-chown nobody:nobody /var/lib/docker/hosts
+sudo touch               /var/lib/docker/hosts
+sudo chmod 0644          /var/lib/docker/hosts
+sudo chown nobody        /var/lib/docker/hosts
 ```
+
+Leave a terminal window open on the docker host, as we'll do a couple more things over there.
 
 ### Start the helper cluster
 
 ```
 rake docker:helpers
 ```
+
+You will see it go build build apt apt apt for a long time.
+
+If everything works, these things will be true:
+
+* Running `cat /var/lib/docker/hosts` (which was empty just moments ago!) will have all sorts of nice information in it, including entries for 'host-filer' and 'deb-proxy'.
+* Running `docker ps` shows containers for `host_filer.helpers` and `deb_proxy.helpers`
+* Running `curl -I http://$(hostname):10000/ | grep 'Content-Length'` has an output (i.e. the deb proxy responds to an HTTP request
 
 ### Build the images
 
@@ -81,3 +93,32 @@ rake cluster:create
 rake cluster:start
 ```
 
+If things have worked,
+
+* `docker ps` should show
+
+```
+CONTAINER ID        IMAGE                        COMMAND                CREATED             STATUS              PORTS                                                              NAMES
+49dd3fe748d9        bd4c/deb_proxy:latest        "/bin/bash"            27 minutes ago      Up 27 minutes       10000/tcp                                                          prickly_bell         
+679312a500aa        blalor/docker-hosts:latest   "/usr/local/bin/dock   42 minutes ago      Up 42 minutes                                                                          host_filer.helpers   
+1402f23d9b21        da9ce761dafe                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          8020/tcp, 50070/tcp, 50470/tcp                                     mad_shockley         
+1e05506b89e4        9adb17f09b14                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          50070/tcp, 50470/tcp, 8020/tcp                                     grave_kirch          
+40e667173e6a        9adb17f09b14                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          8020/tcp, 50070/tcp, 50470/tcp                                     hopeful_darwin       
+994664c60827        b5b80f1fd5e2                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          8020/tcp, 50070/tcp, 50470/tcp                                     romantic_yonath      
+d12d0b71c978        d303575ad9a7                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          50470/tcp, 8020/tcp, 50070/tcp                                     elegant_yonath       
+8a269c0a917d        c0694ac34979                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          50070/tcp, 50470/tcp, 8020/tcp                                     suspicious_bartik    
+6845ab5c4708        blalor/docker-hosts:latest   "/usr/local/bin/dock   19 hours ago        Up 19 hours                                                                            host_filer.helper    
+23d75487641b        b8141723fa03                 "/etc/squid-deb-prox   19 hours ago        Up 19 hours         443/tcp, 80/tcp, 0.0.0.0:10000->10000/tcp, 0.0.0.0:10022->22/tcp   deb_proxy.helper
+```
+
+
+* http://localhost:50070/dfshealth.html#tab-datanode opens an returns contetn (Yay the namenode is working)
+* 
+
+### Utilities
+
+`rake -P` will list all the things rake knows how to do
+
+* `rake docker:df`         -- runs boot2docker to get the free space on the docker host
+* `rake docker:rm_stopped` -- DANGEROUS -- removes all stopped containers. 
+* `rake docker:rmi_all    `-- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate  It will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
