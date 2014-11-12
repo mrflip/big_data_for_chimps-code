@@ -1,8 +1,5 @@
 # Big Data for Chimps Example Code
 
-
-
-
 ## Generating Docker containers
 
 
@@ -25,11 +22,24 @@ Install :
 
 You must use that version -- others will not work (lack hostname option)
 
+### If you're running under boot2docker
+
+You'll probably want to forward the hadoop ports:
+
+```
+boot2docker down
+rake docker:open_ports
+boot2docker up
+```
+
+When you run `boot2docker up` and check that you have the env variable set that it says to 
+For me, it's `export DOCKER_HOST=tcp://192.168.59.103:2375`
+
 ### Pre-seed the base images
 
 ```
 docker pull phusion/baseimage:latest
-docker pull blalor/docker-hosts
+docker pull blalor/docker-hosts:latest
 ```
 
 ### Start the helper cluster
