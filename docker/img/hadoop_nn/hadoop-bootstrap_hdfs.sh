@@ -38,5 +38,8 @@ sudo -u hdfs hadoop fs -chmod 1777        $HADOOP_BULK_DIR/yarn-staging
 sudo -u hdfs hadoop fs -chmod -R 1777     $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate
 sudo -u hdfs hadoop fs -chown -R mapred   $HADOOP_BULK_DIR/yarn-staging
 
+sudo -u hdfs hadoop fs -mkdir -p /user/chimpy
+sudo -u hdfs hadoop fs -chown chimpy      /user/chimpy
+
 sudo -u hdfs hadoop fs -ls -R /
 

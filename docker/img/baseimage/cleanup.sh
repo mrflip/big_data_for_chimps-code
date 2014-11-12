@@ -2,6 +2,8 @@
 
 updatedb
 
+rm -rf /build
+
 rm -f /etc/dpkg/dpkg.cfg.d/02apt-speedup
 
 apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

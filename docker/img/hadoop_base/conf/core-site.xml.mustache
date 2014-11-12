@@ -4,7 +4,7 @@
   
   <!-- Directories -->
 
-  <property> <name>hadoop.tmp.dir</name>                      <value>{{HADOOP_TMP_DIR}}/hadoop-${user.name}</value> </property>
+  <!-- <property> <name>hadoop.tmp.dir</name>                      <value>{{HADOOP_TMP_DIR}}/hadoop-${user.name}</value> </property> -->
   <property> <name>hadoop.log.dir</name>                      <value>{{HADOOP_LOG_DIR}}</value> </property>
   
   <!-- HDFS  -->
@@ -14,6 +14,9 @@
   <!-- <property> <name>io.compression.codecs</name>          <value>org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.SnappyCodec</value> </property> -->
   <!-- <property> <name>io.compression.codec.lzo.class</name> <value>com.hadoop.compression.lzo.LzoCodec</value> </property> -->
 
+
+  <!-- <property><name>hadoop.http.staticuser.user</name><value>hdfs</value> </property> -->
+  
   <!-- Pseudo-only -->
   
   <property> <name>fs.defaultFS</name>                        <value>hdfs://{{HADOOP_NN_HOSTNAME}}:8020</value>  </property>

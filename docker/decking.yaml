@@ -14,7 +14,7 @@ images:
 containers:
   host_filer:
     image:       "blalor/docker-hosts"
-    extra:       "/srv/hosts"
+    extra:       "/srv/hosts" # --domain-name=bd4c 
     mount:
       - "/var/lib/docker/hosts:/srv/hosts"
       - "/var/run/docker.sock:/var/run/docker.sock"
@@ -25,7 +25,7 @@ containers:
   deb_proxy:
     # # name of the image to use
     image:        "bd4c/deb_proxy"
-    port:         [ "10000:10000", "10022:22" ]
+    port:         [ "10022:22", "10000:10000" ]
     mount:        ["/tmp/deb_proxy:/bulk/deb_proxy"]
     hostname:     "deb-proxy"
 
@@ -34,7 +34,22 @@ containers:
   hadoop_base:
     image:        "bd4c/hadoop_base"
     port:         [ "10122:22" ]
-  
+
+  hadoop_lounge:
+    image:        "bd4c/hadoop_base"
+    hostname:     "lounge"
+    port:         [ "9022:22", "8888:8888" ]
+    dependencies:
+      - "hadoop_nn:nn"
+      - "hadoop_rm:nn"
+      - "hadoop_worker:worker"
+
+  #
+  # TODO: We have hardcoded port mappings to the docker host, which is
+  # convenient. It also however forces us to have a one-worker-only cluster.
+  # Make it be one hero worker and a pool of 0..n anonymous workers (or just a
+  # sea of anonymous workers)
+  #
   hadoop_worker:
     image:        "bd4c/hadoop_worker"
     # node mgr:  console http 8042 / https 8044, localizer 8040, ipc 8041, ganglia 8660
@@ -44,9 +59,16 @@ containers:
       - "hadoop_nn:nn"
       - "hadoop_rm:rm"
     mount:
+      - "/var/lib/docker/hosts:/etc/hosts:ro"
       - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
-    # hostname:     "worker0"
-
+    hostname:     "worker"
+  # 
+  # hadoop_hue:
+  #   image:        "bd4c/hadoop_base"
+  #   hostname:     "hue"
+  #   # http 8888
+  #   port:         [ "9222:22", "8888:8888" ]
+    
   hadoop_rm:
     image:        "bd4c/hadoop_rm"
     hostname:     "rm"
@@ -57,6 +79,7 @@ containers:
     dependencies:
       - "hadoop_nn:nn"
     mount:
+      - "/var/lib/docker/hosts:/etc/hosts:ro"
       - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
     
   hadoop_nn:
@@ -77,21 +100,8 @@ containers:
     dependencies:
       - "hadoop_nn:nn"
     mount:
+      - "/var/lib/docker/hosts:/etc/hosts:ro"
       - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
-
-  # hadoop_foyer:
-  #   image:        "bd4c/hadoop_base"
-  #   hostname:     "foyer"
-  #   port:         [ "9022:22", "8888:8888" ]
-  #   hostname:     "hue"
-  #   dependencies:
-  #     - "hadoop_nn:nn"
-  # 
-  # hadoop_hue:
-  #   image:        "bd4c/hadoop_base"
-  #   hostname:     "hue"
-  #   # http 8888
-  #   port:         [ "9222:22", "8888:8888" ]
       
   # Zookeeper   -- client 2181, ipc 2888, election 3888, JMX 9010, failover 8019
   # Httpfs      -- admin 14001, rest 14000
@@ -104,12 +114,11 @@ clusters:
     - host_filer
     - deb_proxy
   dev:
-    # - baseimage
-    - hadoop_base
     - hadoop_nn
     - hadoop_rm
     - hadoop_snn
     - hadoop_worker
+    - hadoop_lounge
 
 groups:
   helpers:

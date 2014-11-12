@@ -15,7 +15,7 @@ namespace :cluster do
 
   task :kill     => [:stop, :rm_containers]
 
-  task :recycle  => [:stop, :rm_containers, 'docker:build', :create, :start]
+  task :recycle  => ['docker:build', :stop, :rm_containers, :create, :start]
 
   task :rm_containers do
     args = `docker ps -a  | grep 'hadoop_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")

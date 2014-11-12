@@ -11,11 +11,12 @@ daemon_user=hdfs
 # keep runit from killing the system if this script crashes
 sleep 1
 
+# /etc/defaults overrides
+. /etc/default/hadoop
+. /etc/default/hadoop-hdfs-secondarynamenode
+
 # System hadoop config
 . /usr/lib/hadoop/libexec/hadoop-config.sh
-
-# /etc/defaults overrides
-. /etc/default/hadoop-hdfs-secondarynamenode
 
 # Conf dir overrides if any
 if [ -f "$HADOOP_CONF_DIR/hadoop-env.sh" ] ; then

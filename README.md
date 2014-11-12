@@ -95,6 +95,9 @@ rake cluster:start
 
 If things have worked,
 
+* http://localhost:50070/dfshealth.html#tab-datanode opens an returns contetn (Yay the namenode is working)
+* http://localhost:8088/cluster/nodes
+
 * `docker ps` should show
 
 ```
@@ -112,13 +115,51 @@ d12d0b71c978        d303575ad9a7                 "/bin/sh -c /build/h   2 hours 
 ```
 
 
-* http://localhost:50070/dfshealth.html#tab-datanode opens an returns contetn (Yay the namenode is working)
-* 
-
 ### Utilities
 
 `rake -P` will list all the things rake knows how to do
 
 * `rake docker:df`         -- runs boot2docker to get the free space on the docker host
 * `rake docker:rm_stopped` -- DANGEROUS -- removes all stopped containers. 
-* `rake docker:rmi_all    `-- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate  It will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
+* `rake docker:rmi_all    `-- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate stages of old builds and left unchecked they will buil This command will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
+
+
+## Troubleshooting
+
+### SSH access
+
+```
+ssh -i insecure_key.pem root@localhost -p 9122
+```
+
+* Client:	      9022
+* Worker:	      9122
+* Hue:		      9222
+* Resource Manager:   9322 (manages but does not run jobs -- the new-school jobtracker)
+* Namenode:	      9422 (manages but does not hold data)
+* Secondary Namenode: 9522 (keeps the cluster healthy. Does *not* act as a failover namenode)
+
+
+### Example job
+
+```
+hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
+```
+
+### Datanode working?
+
+On the worker machine:
+
+* `elinks http://$(hostname):50075/` loads, shows you 'DataNode on'
+* 
+
+
+```
+docker run				      \
+  -p 9122:22 -p 8042:8042 -p 50075:50075      \
+  -v /tmp/bulk/hadoop/log:/bulk/hadoop/log:rw \
+  --link hadoop_rm:rm --link hadoop_nn:nn     \
+  --rm -it bd4c/hadoop_worker		      \
+  --name hadoop_worker.tmp
+  
+```

@@ -3,6 +3,8 @@ MAINTAINER Flip Kromer <flip@infochimps.com>
 MAINTAINER Russell Jurney
 WORKDIR /root
 
+ENV YARN_EXAMPLES /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar
+
 # ---------------------------------------------------------------------------
 # 
 # Configure Hadoop client

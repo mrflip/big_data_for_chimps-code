@@ -32,6 +32,7 @@ ENV HADOOP_CONF_DIR /etc/hadoop/conf.cluster
 # Construct the hadoop users
 COPY img/hadoop_base/hadoop-add_users.sh    /build/
 RUN           /build/hadoop-add_users.sh
+COPY img/hadoop_client/conf/bashrc /home/chimpy/.bashrc
 
 # Install and configure Hadoop & Zookeeper components common to all images
 COPY img/hadoop_base/hadoop-setup_common.sh /build/
