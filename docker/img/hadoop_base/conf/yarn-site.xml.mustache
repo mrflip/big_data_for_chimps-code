@@ -9,8 +9,9 @@
   <!-- Directories -->
 
   <property> <name>yarn.nodemanager.log-dirs</name>                <value>{{HADOOP_LOG_DIR}}/yarn-containers</value>	     <description>Container log location</description> </property>
-  <property> <name>yarn.nodemanager.remote-app-log-dir</name>      <value>{{HADOOP_LOG_DIR}}/yarn-apps</value>		     <description>Application log location</description> </property>
-  <property> <name>yarn.nodemanager.local-dirs</name>              <value>{{HADOOP_LOCL_DIR}}/yarn-jobs/${user.name}</value> <description>Job-local file location</description> </property>
+  <property> <name>yarn.nodemanager.local-dirs</name>              <value>{{HADOOP_BULK_DIR}}/yarn-jobs/${user.name}</value> <description>Job-local file location</description> </property>
+  <!-- Note that this is on the HDFS -->
+  <property> <name>yarn.nodemanager.remote-app-log-dir</name>      <value>{{HADOOP_LOG_DIR}}/yarn-apps</value>                <description>Application log location</description> </property>
 
   <!-- Logging -->
 

@@ -6,42 +6,37 @@ echo
 echo "Nodemanager runit script invoked at `date`"
 echo
 
+daemon_user=yarn
+
 # keep runit from killing the system if this script crashes
 sleep 1
 
-# System hadoop config
+# System yarn config
 . /usr/lib/hadoop/libexec/hadoop-config.sh
 
-# /etc/defaults overrides if any
-if [ -f "/etc/default/hadoop-hdfs-nodemanager" ] ; then
-  . "/etc/default/hadoop-hdfs-nodemanager"
-fi
+# /etc/defaults overrides
+. /etc/default/hadoop-yarn-nodemanager
 
 # Conf dir overrides if any
 if [ -f "$HADOOP_CONF_DIR/hadoop-env.sh" ] ; then
   . "$HADOOP_CONF_DIR/hadoop-env.sh"
 fi
 
+export YARN_OPTS="$YARN_OPTS  -Djava.net.preferIPv4Stack=true"
+
 # Set the ulimit, then prove the new settings got there
 ulimit -S -n 65535 
-chpst -u hdfs bash -c 'ulimit -S -a'
-
-# echo "also: $HADOOP_LOGFILE -  - $HADOOP_ROOT_LOGGER - $HADOOP_SECURITY_LOGGER - $HDFS_AUDIT_LOGGER - $HADOOP_JHS_LOGGER - $HADOOP_MAPRED_HOME - $HADOOP_MAPRED_IDENT_STRING - $HADOOP_MAPRED_LOGFILE - $HADOOP_MAPRED_NICENESS - $HADOOP_MAPRED_ROOT_LOGGER - $HADOOP_NICENESS - $HADOOP_PID_DIR - $YARN_IDENT_STRING - $YARN_LOGFILE - $YARN_LOG_DIR - $YARN_NICENESS - $YARN_ROOT_LOGGER'"
-# set | sort
+chpst -u $daemon_user /bin/bash -c 'ulimit -S -a'
 
 # Dump the salient env vars now that there's no doubt
 echo
-echo "HADOOP_HDFS_HOME    '$HADOOP_HDFS_HOME'"
 echo "HADOOP_OPTS         '$HADOOP_OPTS'"
 echo "HADOOP_CONF_DIR     '$HADOOP_CONF_DIR'"
-echo "CLASSPATH           '$CLASSPATH'"
-echo "HADOOP_IDENT_STRING '$HADOOP_IDENT_STRING'"
-echo "HADOOP_LOG_DIR      '$HADOOP_LOG_DIR'"
 echo "JAVA_HOME           '$JAVA_HOME'"
+env | egrep '^(HADOOP|YARN|JAVA_HOME)'
 echo
 
 echo ; echo "Launching Nodemanager" ; echo
 
-cd /var/lib/hadoop-hdfs
-exec chpst -u hdfs /usr/bin/hdfs --config $HADOOP_CONF_DIR nodemanager < /dev/null
-
+cd /var/lib/hadoop-yarn
+exec chpst -u $daemon_user /usr/bin/yarn --config $HADOOP_CONF_DIR nodemanager < /dev/null

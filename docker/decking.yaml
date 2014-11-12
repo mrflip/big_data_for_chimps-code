@@ -42,7 +42,7 @@ containers:
       - "hadoop_nn:nn"
       - "hadoop_rm:rm"
     mount:
-      - "/tmp/bulk/log:/bulk/log:rw"
+      - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
   hadoop_rm:
     image:        "bd4c/hadoop_rm"
@@ -51,8 +51,10 @@ containers:
     #           tracker 8031; ipc 8032; admin 8033; ganglia 8660, shuffle 13562;
     # history:  console 19888 / https 19890, ipc 10020, admin 1033
     port:         [ "9322:22", "8088:8088", "8090:8090", "8030:8030", "8031:8031", "8032:8032", "8033:8033", "19888:19888", "19890:19890", "10020:10020", "10033:10033", "13562:13562" ]
+    dependencies:
+      - "hadoop_nn:nn"
     mount:
-      - "/tmp/bulk/log:/bulk/log:rw"
+      - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
     
   hadoop_nn:
     image:        "bd4c/hadoop_nn"
@@ -62,7 +64,7 @@ containers:
     mount:
        # dynamic /etc/hosts file
       - "/var/lib/docker/hosts:/etc/hosts:ro"
-      - "/tmp/bulk/log:/bulk/log:rw"
+      - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
     
   hadoop_snn:
     image:        "bd4c/hadoop_snn"
@@ -72,7 +74,7 @@ containers:
     dependencies:
       - "hadoop_nn:nn"
     mount:
-      - "/tmp/bulk/log:/bulk/log:rw"
+      - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
   # hadoop_foyer:
   #   image:        "bd4c/hadoop_base"

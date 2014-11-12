@@ -24,7 +24,7 @@ update-alternatives --install /etc/hadoop/conf hadoop-conf $HADOOP_CONF_DIR 50
 update-alternatives --set                      hadoop-conf $HADOOP_CONF_DIR
 
 # Make the Hadoop directories
-mkdir -p            $HADOOP_PERM_DIR $HADOOP_LOCL_DIR
+mkdir -p            $HADOOP_BULK_DIR
 mkdir -p            $HADOOP_LOG_DIR  $HADOOP_TMP_DIR
 chown hadoop:hadoop $HADOOP_LOG_DIR  $HADOOP_TMP_DIR
 chmod 0775          $HADOOP_LOG_DIR  $HADOOP_TMP_DIR
@@ -32,7 +32,5 @@ chmod 0775          $HADOOP_LOG_DIR  $HADOOP_TMP_DIR
 # cleanup
 
 aptitude search hadoop | sort
-echo $PERM_DIR $LOCL_DIR $LOG_DIR $HADOOP_PERM_DIR $HADOOP_LOG_DIR $HADOOP_TMP_DIR
-
 
 echo "**********" ; du --exclude=proc -smc /

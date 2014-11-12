@@ -5,27 +5,21 @@ MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 # Environment
 #
 
-ENV     HADOOP_APT_VERSION precise-cdh5.2.0
+ENV HADOOP_APT_VERSION precise-cdh5.2.0
 
 # Centralize the interesting directories so their lifecycle can be tracked
-# separately from the machine image. In a production setting these would
-# correspond to distinct volumes with different durability/speed/etc tradeoffs
-ENV     BULK_DIR         /bulk 
-# Directory where durable data -- HDFS, databases, etc -- should live
-ENV     PERM_DIR         /bulk/perm
-# Directory for local ephemeral-ish data -- fast scratch space for transaction journals
-ENV     LOCL_DIR         /bulk/locl
-# Directory for logs
-ENV     LOG_DIR          /bulk/log
+# separately from the machine image by mounting volumes
+ENV HADOOP_BULK_DIR  /bulk/hadoop
+ENV ZK_BULK_DIR      /bulk/zookeeper
 
 # Specific directories for hadoop and zookeeper
-ENV     HADOOP_PERM_DIR  $PERM_DIR/hadoop
-ENV     HADOOP_LOCL_DIR  $LOCL_DIR/hadoop
-ENV     HADOOP_TMP_DIR   $LOCL_DIR/hadoop/tmp
-ENV     HADOOP_LOG_DIR   $LOG_DIR/hadoop
-ENV     ZK_PERM_DIR      $PERM_DIR/zookeeper/db
-ENV     ZK_LOCL_DIR      $LOCL_DIR/zookeeper/txlog
-ENV     ZK_LOG_DIR       $LOG_DIR/zookeeper
+ENV HADOOP_TMP_DIR   $HADOOP_BULK_DIR/tmp
+ENV HADOOP_LOG_DIR   $HADOOP_BULK_DIR/log
+ENV ZK_DB_DIR        $ZK_BULK_DIR/db
+ENV ZK_JOURNAL_DIR   $ZK_BULK_DIR/txlog
+ENV ZK_LOG_DIR       $ZK_BULK_DIR/log
+
+ENV HADOOP_NN_HOSTNAME nn
 
 # Hadoop config stored here, and linked as the standard /etc/hadoop/conf
 ENV HADOOP_CONF_DIR /etc/hadoop/conf.cluster
