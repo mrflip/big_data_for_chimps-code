@@ -22,9 +22,11 @@ Install :
 
 You must use that version -- others will not work (lack hostname option)
 
+From here out, everything will take place within the `docker/` directory
+
 ### If you're running under boot2docker
 
-You'll probably want to forward the hadoop ports:
+You'll probably want to forward the hadoop ports. We need to pause the boot2docker VM for a moment to accomplish this, so let's do that now:
 
 ```
 boot2docker down
@@ -32,8 +34,7 @@ rake docker:open_ports
 boot2docker up
 ```
 
-When you run `boot2docker up` and check that you have the env variable set that it says to 
-For me, it's `export DOCKER_HOST=tcp://192.168.59.103:2375`
+When you run `boot2docker up`, make sure that you have the env variable set -- for me, it's `export DOCKER_HOST=tcp://192.168.59.103:2375` (but yours might be different).
 
 ### Pre-seed the base images
 
