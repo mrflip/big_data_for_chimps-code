@@ -115,6 +115,3 @@ groups:
   helpers:
     containers:
       deb_proxy:        { port: ["10022:22","10000:10000"] }
-  # dev:
-  #   containers:
-  #     hadoop_worker:    { hostname:     "rm" }
