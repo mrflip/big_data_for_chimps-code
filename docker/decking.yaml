@@ -98,8 +98,8 @@ containers:
 
 clusters:
   helper:
-    - deb_proxy
     - host_filer
+    - deb_proxy
   dev:
     # - baseimage
     - hadoop_base

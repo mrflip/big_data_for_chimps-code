@@ -1,5 +1,5 @@
 
-HADOOP_IMAGES = %w[ bd4c/hadoop_base bd4c/hadoop_nn bd4c/hadoop_rm bd4c/hadoop_snn bd4c/hadoop_worker ]
+HADOOP_IMAGES = %w[ bd4c/baseimage bd4c/hadoop_base bd4c/hadoop_nn bd4c/hadoop_rm bd4c/hadoop_snn bd4c/hadoop_worker ]
 
 namespace :cluster do
   task :start do
@@ -16,7 +16,7 @@ namespace :cluster do
 
   task :kill     => [:stop, :rm_containers]
 
-  task :recycle  => [:stop, :rm_containers, :build, :create, :start]
+  task :recycle  => [:stop, :rm_containers, 'docker:build', :create, :start]
 
   task :rm_containers do
     args = `docker ps -a  | grep 'hadoop_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
@@ -24,13 +24,6 @@ namespace :cluster do
       puts "No stopped containers to kill"
     else
       sh "docker rm #{args} ; true"
-    end
-  end
-
-  task :build do
-    HADOOP_IMAGES.each do |img_name|
-      banner("Building #{img_name}")
-      sh("decking build #{img_name}")
     end
   end
 
@@ -45,6 +38,23 @@ namespace :docker do
     else
       sh "docker rm #{args} ; true"
     end
+  end
+
+  task :build do
+    HADOOP_IMAGES.each do |img_name|
+      banner("Building #{img_name}")
+      sh("decking build #{img_name}")
+    end
+  end
+
+  task :helpers do
+    sh "decking build bd4c/deb_proxy"
+    sh "decking create helpers"
+    sh "decking start  helpers"
+  end
+
+  task :helpers_stop do
+    sh "decking stop helpers"
   end
 
   task :rmi_all do
