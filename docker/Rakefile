@@ -45,6 +45,18 @@ end
 
 namespace :docker do
 
+  task :make_gold_sheller do
+    sh "docker run -it --name data_gold  --volume '/data/gold' bd4c/data_gold mirror /data/gold"
+  end
+
+  task :make_gold_sheller do
+    sh "docker run -it --name dg_sheller --volume '/data/gold' bd4c/data_gold shell"
+  end
+
+  task :make_gold_archiver do
+    sh "docker run -it --name dg_archiver --volumes-from data_gold bd4c/data_gold mirror /data/gold"
+  end
+
   task :build do
     HADOOP_IMAGES.each do |img_name|
       banner("Building #{img_name}")

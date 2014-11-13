@@ -79,7 +79,6 @@ else
   echo
   git init
   git remote add --fetch stored "$ARCHIVE"
-  git remote set-head stored --delete || true
   echo
   echo "  ===== Advancing to the last commit in stored/master"; echo
   git reset stored/master || true
@@ -93,7 +92,6 @@ fi
 echo
 
 cd $TARGET
-git gc
 
 echo "  ===== Updating archive to mirror $TARGET"; echo
 

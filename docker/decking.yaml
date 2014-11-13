@@ -21,11 +21,11 @@ containers:
   # Data
   #
 
-  data_gold:  { mount: ["/data/gold:/data/gold:rw"],             extra: "mirror /data/gold",        image: "bd4c/data_gold",        hostname: "data-gold" }
-  data_outd:  { mount: ["/data/outd:/data/outd:rw"],             extra: "mirror /data/outd",        image: "bd4c/databox_archiver", hostname: "data-outd" }
+  data_gold:  { mount: ["/data/gold"],        extra: "mirror /data/gold",        image: "bd4c/data_gold",        hostname: "data-gold" }
+  data_outd:  { mount: ["/data/outd"],        extra: "mirror /data/outd",        image: "bd4c/databox_archiver", hostname: "data-outd" }
 
-  data_nn:    { mount: ["/bulk/hadoop/name:/bulk/hadoop/name"],  extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-nn" }
-  data_hdfs0: { mount: ["/bulk/hadoop/hdfs0:/bulk/hadoop/hdfs"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-hdfs0" }
+  data_nn:    { mount: ["/bulk/hadoop/name"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-nn" }
+  data_hdfs0: { mount: ["/bulk/hadoop/hdfs"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-hdfs0" }
       
   # "bd4c/hdfs_nn_data"
   # "bd4c/hdfs_dn0_data"
