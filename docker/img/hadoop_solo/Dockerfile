@@ -4,6 +4,13 @@ MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 ENV HADOOP_NN_HOSTNAME solo
 ENV HADOOP_RM_HOSTNAME solo
 
+ENV HADOOP_CONF_DIR    /etc/hadoop/conf.single
+# Get our own set of conf files
+RUN \
+  cp -rp  /etc/hadoop/conf.empty $HADOOP_CONF_DIR && \
+  update-alternatives --install /etc/hadoop/conf hadoop-conf $HADOOP_CONF_DIR 50 && \
+  update-alternatives --set                      hadoop-conf $HADOOP_CONF_DIR
+
 # Ports
 #
 # are you ready to see a really long list of ports?

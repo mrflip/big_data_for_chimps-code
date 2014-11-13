@@ -7,39 +7,51 @@ images:
   "bd4c/hadoop_nn":        "./img/hadoop_nn"
   "bd4c/hadoop_rm":        "./img/hadoop_rm"
   "bd4c/hadoop_snn":       "./img/hadoop_snn"
-  # "bd4c/hadoop_hue":       "./img/hadoop_hue"
   "bd4c/hadoop_worker":    "./img/hadoop_worker"
-  "bd4c/hadoop_solo":    "./img/hadoop_solo"
+  "bd4c/hadoop_lounge":    "./img/hadoop_lounge"
+  "bd4c/hadoop_solo":      "./img/hadoop_solo"
+  #
+  "bd4c/datasets":         "./img/datasets"
 
 # Containers to define. Options here correspond to common 'docker run' options.
 containers:
-  host_filer:
-    image:       "blalor/docker-hosts"
-    extra:       "/srv/hosts" # --domain-name=bd4c
+
+  # ===========================================================================
+  #
+  # Data
+  #
+
+  datasets:
+    image:         "bd4c/datasets"
+    hostname:      "datasets"
     mount:
-      - "/var/lib/docker/hosts:/srv/hosts"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    hostname:     "host-filer"
-
-  # These containers have a directory given in "images" above, so they are built
-  # locally from the corresponding Dockerfile
-  deb_proxy:
-    # # name of the image to use
-    image:        "bd4c/deb_proxy"
-    port:         [ "10022:22", "10000:10000" ]
-    mount:        ["/tmp/deb_proxy:/bulk/deb_proxy"]
-    hostname:     "deb-proxy"
-
-  baseimage:      "bd4c/baseimage"
-
-  hadoop_base:
-    image:        "bd4c/hadoop_base"
+      - "/mnt/data/gold"
+      - "/mnt/data/rawd"
+      - "/mnt/data/outd"
     port:         [ "10122:22" ]
+      
+  # "bd4c/hdfs_nn_data"
+  # "bd4c/hdfs_dn0_data"
+  # "bd4c/hadoop_solo":      "./img/hadoop_solo"
 
+  # ===========================================================================
+  #
+  # Hadoop machines
+  #
+
+  hadoop_base:    "bd4c/hadoop_base"
+
+  #
+  # Running hue on the lounge so that there's only one URL users need to learn.
+  #
   hadoop_lounge:
-    image:        "bd4c/hadoop_base"
+    image:        "bd4c/hadoop_lounge"
     hostname:     "lounge"
-    port:         [ "9022:22", "8888:8888" ]
+    port:         [ "9022:22", "9001:8888" ]
+    mount:
+      - "/tmp/solo/hadoop/log:/bulk/hadoop/log:rw"
+    mount-from:
+      - "datasets"
     dependencies:
       - "hadoop_nn:nn"
       - "hadoop_rm:nn"
@@ -54,7 +66,6 @@ containers:
     mount:
       - "/tmp/solo/hadoop/log:/bulk/hadoop/log:rw"
     hostname:     "solo"
-
 
   #
   # TODO: We have hardcoded port mappings to the docker host, which is
@@ -74,13 +85,6 @@ containers:
       - "/var/lib/docker/hosts:/etc/hosts:ro"
       - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
     hostname:     "worker"
-
-  #
-  # hadoop_hue:
-  #   image:        "bd4c/hadoop_base"
-  #   hostname:     "hue"
-  #   # http 8888
-  #   port:         [ "9222:22", "8888:8888" ]
 
   hadoop_rm:
     image:        "bd4c/hadoop_rm"
@@ -121,6 +125,35 @@ containers:
   # HDFS-NFS    -- gateway 2049, mountd 4242, portmap 111
   # Failover    -- 8018
 
+  #
+  # Helper images
+  #
+
+  host_filer:
+    image:       "blalor/docker-hosts"
+    extra:       "/srv/hosts" # --domain-name=mrflip
+    mount:
+      - "/var/lib/docker/hosts:/srv/hosts"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    hostname:     "host-filer"
+    
+  # These containers have a directory given in "images" above, so they are built
+  # locally from the corresponding Dockerfile
+  deb_proxy:
+    # # name of the image to use
+    image:        "bd4c/deb_proxy"
+    port:         [ "10022:22", "10000:10000" ]
+    mount:        ["/tmp/deb_proxy:/bulk/deb_proxy"]
+    hostname:     "deb-proxy"
+
+  #
+  # Haven't tested these
+  #
+  
+  elasticsearch:  dockerfile/elasticsearch
+  mysql:          library/mysql
+  mongo:          library/mongo
+  
 clusters:
   helpers:
     - host_filer
@@ -130,6 +163,7 @@ clusters:
     - hadoop_rm
     - hadoop_snn
     - hadoop_worker
+    - datasets
     - hadoop_lounge
   han:
     - hadoop_solo

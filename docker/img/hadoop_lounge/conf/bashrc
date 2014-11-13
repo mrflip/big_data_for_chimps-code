@@ -32,20 +32,6 @@ shopt -s checkwinsize
 
 # make less more friendly for non-text input files, see lesspipe(1)
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
-export LESS="-eFXir"
-alias more=less
-
-# tab completion case-insensitive
-shopt -s nocaseglob
-
-# terminated background jobs reported immediately, rather than waiting for prompt
-set -o notify
-
-# Be verbose about time
-export TIMEFORMAT=$'\nreal\t%3lR\tuser\t%3lU\tsys\t%3lS\tpct\t%P'
-
-# Turn off core dumps
-ulimit -S -c 0
 
 # set variable identifying the chroot you work in (used in the prompt below)
 if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
@@ -131,3 +117,21 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
+
+export LESS="-eFXir"
+alias more=less
+
+# tab completion case-insensitive
+shopt -s nocaseglob
+
+# terminated background jobs reported immediately, rather than waiting for prompt
+set -o notify
+
+# Be verbose about time
+export TIMEFORMAT=$'\nreal\t%3lR\tuser\t%3lU\tsys\t%3lS\tpct\t%P'
+
+# Turn off core dumps
+ulimit -S -c 0
+
+export LC_ALL="en_US.UTF-8"
+export LANG="en_US.UTF-8"
