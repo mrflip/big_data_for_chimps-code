@@ -59,6 +59,7 @@ When you run `boot2docker up`, make sure that you have the env variable set -- f
 ```
 docker pull phusion/baseimage:0.9.15
 docker pull blalor/docker-hosts:latest
+docker pull busybox
 ```
 
 ### Minor setup needed on the docker host

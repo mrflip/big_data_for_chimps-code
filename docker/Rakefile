@@ -4,7 +4,14 @@ HADOOP_IMAGES = [
   'baseimage', 'hadoop_base',
   'hadoop_lounge',
   'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker'
-  ].map{|slug| "#{DOCKER_USER}/#{slug}" }
+].map{|slug| "#{DOCKER_USER}/#{slug}" }
+
+HADOOP_CONTAINERS = [
+  'hadoop_lounge',
+  'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker',
+  'data_gold', 'data_outd', 'data_nn', 'data_hdfs0'
+]
+
 
 namespace :cluster do
   task :start do
@@ -26,11 +33,12 @@ namespace :cluster do
   task :recycle  => ['docker:build', :kill, :create, :start]
 
   task :rm_containers do
-    args = `docker ps -a  | grep 'hadoop_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
+    # args = `docker ps -a  | grep -e 'hadoop_|data_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
+    args = HADOOP_CONTAINERS
     if args.empty?
       puts "No stopped containers to kill"
     else
-      sh "docker rm #{args} ; true"
+      sh "docker rm #{args.join(" ")} ; true"
     end
   end
 end

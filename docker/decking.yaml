@@ -11,7 +11,7 @@ images:
   "bd4c/hadoop_lounge":    "./img/hadoop_lounge"
   "bd4c/hadoop_solo":      "./img/hadoop_solo"
   #
-  "bd4c/datasets":         "./img/datasets"
+  "bd4c/databox_archiver": "./img/datasets"
 
 # Containers to define. Options here correspond to common 'docker run' options.
 containers:
@@ -21,14 +21,11 @@ containers:
   # Data
   #
 
-  datasets:
-    image:         "mrflip/datasets:0.02"
-    hostname:      "datasets"
-    mount:
-      - "/mnt/data/gold"
-      - "/mnt/data/rawd"
-      - "/mnt/data/outd"
-    port:         [ "10122:22" ]
+  data_gold:  { mount: ["/data/gold:/data/gold:rw"],             extra: "mirror /data/gold",        image: "bd4c/data_gold",        hostname: "data-gold" }
+  data_outd:  { mount: ["/data/outd:/data/outd:rw"],             extra: "mirror /data/outd",        image: "bd4c/databox_archiver", hostname: "data-outd" }
+
+  data_nn:    { mount: ["/bulk/hadoop/name:/bulk/hadoop/name"],  extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-nn" }
+  data_hdfs0: { mount: ["/bulk/hadoop/hdfs0:/bulk/hadoop/hdfs"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-hdfs0" }
       
   # "bd4c/hdfs_nn_data"
   # "bd4c/hdfs_dn0_data"
@@ -51,7 +48,8 @@ containers:
     mount:
       - "/tmp/solo/hadoop/log:/bulk/hadoop/log:rw"
     mount-from:
-      - "datasets"
+      - "data_gold"
+      - "data_outd"
     dependencies:
       - "hadoop_nn:nn"
       - "hadoop_rm:nn"
@@ -159,11 +157,14 @@ clusters:
     - host_filer
     - deb_proxy
   dev:
+    - data_nn
+    - data_hdfs0
+    - data_outd
+    - data_gold
     - hadoop_nn
     - hadoop_rm
     - hadoop_snn
     - hadoop_worker
-    - datasets
     - hadoop_lounge
   han:
     - hadoop_solo
