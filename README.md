@@ -1,5 +1,19 @@
 # Big Data for Chimps Example Code
 
+OK if you do a docker pull on mrflip/datasets:0.02 you will get a docker image with the data in it. I also pushed the other images as bd4c/hadoop_nn, etc -- but they should build clean too.
+
+```
+rake docker:pull
+```
+
+The lounge node is where you should go to run stuff. it has pig, which I've verified works.
+
+If you visit http://$DOCKER_IP:9001/ you should see hue, because using yarn to watch jobs = fuck me.
+
+I haven't figured out the linking of data between machines so for now there si a manual step where you ssh to 10122 and copy the data from /data/gold (where it lives) to /mnt/data/gold (where it is shared to the lounge). Then you should see on the lounge machine the data appear in those directories.
+
+I'll try to get rid of that step later tonight.
+
 ## Generating Docker containers
 
 

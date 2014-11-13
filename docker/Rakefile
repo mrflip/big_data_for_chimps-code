@@ -1,9 +1,9 @@
 DOCKER_USER = ENV['DOCKER_USER '] || 'bd4c'
 
 HADOOP_IMAGES = [
-  # 'baseimage', 'hadoop_base',
+  'baseimage', 'hadoop_base',
   'hadoop_lounge',
-  # 'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker'
+  'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker'
   ].map{|slug| "#{DOCKER_USER}/#{slug}" }
 
 namespace :cluster do
@@ -41,6 +41,20 @@ namespace :docker do
     HADOOP_IMAGES.each do |img_name|
       banner("Building #{img_name}")
       sh("decking build #{img_name}")
+    end
+  end
+
+  task :pull do
+    HADOOP_IMAGES.each do |img_name|
+      banner("Pull #{img_name} -- this can take a stupidly long time")
+      sh("docker pull #{img_name}")
+    end
+  end
+
+  task :push do
+    HADOOP_IMAGES.each do |img_name|
+      banner("Push #{img_name} -- this can take a stupidly long time, and you have to be part of the bd4c org for it to work")
+      sh("docker push #{img_name}")
     end
   end
 
