@@ -22,7 +22,7 @@ containers:
   #
 
   datasets:
-    image:         "bd4c/datasets"
+    image:         "mrflip/datasets:0.02"
     hostname:      "datasets"
     mount:
       - "/mnt/data/gold"
