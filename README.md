@@ -1,5 +1,19 @@
 # Big Data for Chimps Example Code
 
+OK if you do a docker pull on mrflip/datasets:0.02 you will get a docker image with the data in it. I also pushed the other images as bd4c/hadoop_nn, etc -- but they should build clean too.
+
+```
+rake docker:pull
+```
+
+The lounge node is where you should go to run stuff. it has pig, which I've verified works.
+
+If you visit http://$DOCKER_IP:9001/ you should see hue, because using yarn to watch jobs = fuck me.
+
+I haven't figured out the linking of data between machines so for now there si a manual step where you ssh to 10122 and copy the data from /data/gold (where it lives) to /mnt/data/gold (where it is shared to the lounge). Then you should see on the lounge machine the data appear in those directories.
+
+I'll try to get rid of that step later tonight.
+
 ## Generating Docker containers
 
 
@@ -45,6 +59,7 @@ When you run `boot2docker up`, make sure that you have the env variable set -- f
 ```
 docker pull phusion/baseimage:0.9.15
 docker pull blalor/docker-hosts:latest
+docker pull busybox
 ```
 
 ### Minor setup needed on the docker host
@@ -95,6 +110,9 @@ rake cluster:start
 
 If things have worked,
 
+* http://localhost:50070/dfshealth.html#tab-datanode opens an returns contetn (Yay the namenode is working)
+* http://localhost:8088/cluster/nodes
+
 * `docker ps` should show
 
 ```
@@ -112,13 +130,51 @@ d12d0b71c978        d303575ad9a7                 "/bin/sh -c /build/h   2 hours 
 ```
 
 
-* http://localhost:50070/dfshealth.html#tab-datanode opens an returns contetn (Yay the namenode is working)
-* 
-
 ### Utilities
 
 `rake -P` will list all the things rake knows how to do
 
 * `rake docker:df`         -- runs boot2docker to get the free space on the docker host
 * `rake docker:rm_stopped` -- DANGEROUS -- removes all stopped containers. 
-* `rake docker:rmi_all    `-- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate  It will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
+* `rake docker:rmi_all    `-- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate stages of old builds and left unchecked they will buil This command will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
+
+
+## Troubleshooting
+
+### SSH access
+
+```
+ssh -i insecure_key.pem root@localhost -p 9122
+```
+
+* Client:	      9022
+* Worker:	      9122
+* Hue:		      9222
+* Resource Manager:   9322 (manages but does not run jobs -- the new-school jobtracker)
+* Namenode:	      9422 (manages but does not hold data)
+* Secondary Namenode: 9522 (keeps the cluster healthy. Does *not* act as a failover namenode)
+
+
+### Example job
+
+```
+hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
+```
+
+### Datanode working?
+
+On the worker machine:
+
+* `elinks http://$(hostname):50075/` loads, shows you 'DataNode on'
+* 
+
+
+```
+docker run				      \
+  -p 9122:22 -p 8042:8042 -p 50075:50075      \
+  -v /tmp/bulk/hadoop/log:/bulk/hadoop/log:rw \
+  --link hadoop_rm:rm --link hadoop_nn:nn     \
+  --rm -it bd4c/hadoop_worker		      \
+  --name hadoop_worker.tmp
+  
+```

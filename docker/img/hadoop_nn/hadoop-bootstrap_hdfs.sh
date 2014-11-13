@@ -26,17 +26,27 @@ until grep 'namenode.NameNode: NameNode RPC up' /tmp/nn_startup_log ; do
 done
 echo "Assuming namenode has started... `date`"
 
-sudo -u hdfs hadoop fs -mkdir -p /tmp /user/root $HADOOP_LOG_DIR/yarn-apps $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate
+# Chimpy user and hive will be added later, but don't want to have to pull these
+# shenanigans twice
+#
+sudo -u hdfs hadoop fs -mkdir -p                          \
+  /tmp                                                    \
+  /user/root /user/chimpy                                 \
+  $HADOOP_LOG_DIR/yarn-apps                               \
+  $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate \
+  /user/hive/warehouse
 
-sudo -u hdfs hadoop fs -chmod -R 1777     /tmp
-
+sudo -u hdfs hadoop fs -chmod -R 1777 \
+  /tmp                                \
+  /user/hive/warehouse                \
+  $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate 
+sudo -u hdfs hadoop fs -chmod    1777     $HADOOP_BULK_DIR/yarn-staging # not -R
+ 
 sudo -u hdfs hadoop fs -chown root        /user/root
-
+sudo -u hdfs hadoop fs -chown chimpy      /user/chimpy
 sudo -u hdfs hadoop fs -chown yarn:mapred $HADOOP_LOG_DIR/yarn-apps
-
-sudo -u hdfs hadoop fs -chmod 1777        $HADOOP_BULK_DIR/yarn-staging
-sudo -u hdfs hadoop fs -chmod -R 1777     $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate
 sudo -u hdfs hadoop fs -chown -R mapred   $HADOOP_BULK_DIR/yarn-staging
 
 sudo -u hdfs hadoop fs -ls -R /
+
 

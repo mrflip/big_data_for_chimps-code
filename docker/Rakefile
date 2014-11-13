@@ -1,4 +1,17 @@
-HADOOP_IMAGES = %w[ bd4c/baseimage bd4c/hadoop_base bd4c/hadoop_nn bd4c/hadoop_rm bd4c/hadoop_snn bd4c/hadoop_worker ]
+DOCKER_USER = ENV['DOCKER_USER '] || 'bd4c'
+
+HADOOP_IMAGES = [
+  'baseimage', 'hadoop_base',
+  'hadoop_lounge',
+  'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker'
+].map{|slug| "#{DOCKER_USER}/#{slug}" }
+
+HADOOP_CONTAINERS = [
+  'hadoop_lounge',
+  'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker',
+  'data_gold', 'data_outd', 'data_nn', 'data_hdfs0'
+]
+
 
 namespace :cluster do
   task :start do
@@ -15,19 +28,34 @@ namespace :cluster do
 
   task :kill     => [:stop, :rm_containers]
 
-  task :recycle  => [:stop, :rm_containers, 'docker:build', :create, :start]
+  task :restart  => [:kill, :create, :start]
+
+  task :recycle  => ['docker:build', :kill, :create, :start]
 
   task :rm_containers do
-    args = `docker ps -a  | grep 'hadoop_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
+    # args = `docker ps -a  | grep -e 'hadoop_|data_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
+    args = HADOOP_CONTAINERS
     if args.empty?
       puts "No stopped containers to kill"
     else
-      sh "docker rm #{args} ; true"
+      sh "docker rm #{args.join(" ")} ; true"
     end
   end
 end
 
 namespace :docker do
+
+  task :make_gold_sheller do
+    sh "docker run -it --name data_gold  --volume '/data/gold' bd4c/data_gold mirror /data/gold"
+  end
+
+  task :make_gold_sheller do
+    sh "docker run -it --name dg_sheller --volume '/data/gold' bd4c/data_gold shell"
+  end
+
+  task :make_gold_archiver do
+    sh "docker run -it --name dg_archiver --volumes-from data_gold bd4c/data_gold mirror /data/gold"
+  end
 
   task :build do
     HADOOP_IMAGES.each do |img_name|
@@ -36,12 +64,26 @@ namespace :docker do
     end
   end
 
+  task :pull do
+    HADOOP_IMAGES.each do |img_name|
+      banner("Pull #{img_name} -- this can take a stupidly long time")
+      sh("docker pull #{img_name}")
+    end
+  end
+
+  task :push do
+    HADOOP_IMAGES.each do |img_name|
+      banner("Push #{img_name} -- this can take a stupidly long time, and you have to be part of the bd4c org for it to work")
+      sh("docker push #{img_name}")
+    end
+  end
+
   task :helpers do
     if not ENV['DOCKER_HOST']
       warn "You don't seem to have a DOCKER_HOST environment variable set -- if the next commands fail, that's why."
     end
     puts "Got DOCKER_HOST of #{ENV['DOCKER_HOST']}"
-    sh "decking build bd4c/deb_proxy"
+    sh "decking build #{DOCKER_USER}/deb_proxy"
     sh "decking create helpers"
     sh "decking start  helpers"
   end
@@ -79,7 +121,7 @@ namespace :docker do
 
   task :history do
     # feae5a29ea12 hb pre ; b52ff881a5fd bi pre db0ad19d8544
-    lines = `docker history --no-trunc bd4c/hadoop_base`.split(/[\r\n]+/).drop(1)
+    lines = `docker history --no-trunc #{DOCKER_USER}/hadoop_base`.split(/[\r\n]+/).drop(1)
     images = lines.each_with_index.map{|line, idx| DockerImage.from_history(line, idx) }
     images.sort_by(&:name).each{|image| puts image.to_s }
   end

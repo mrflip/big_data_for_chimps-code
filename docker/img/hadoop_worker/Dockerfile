@@ -33,6 +33,9 @@ COPY img/hadoop_base/conf/hdfs-site.xml.mustache   $HADOOP_CONF_DIR/
 COPY img/hadoop_base/conf/yarn-site.xml.mustache   $HADOOP_CONF_DIR/
 COPY img/hadoop_base/conf/mapred-site.xml.mustache $HADOOP_CONF_DIR/
 
+# Ensures Hadoop directories are happy and permissioned even if we mount something under them.
+COPY img/hadoop_worker/conf/init-hadoop_worker_fixup.sh /etc/my_init.d/30_hadoop_worker_fixup.sh
+
 # Enable the service daemons
 #
 COPY img/hadoop_worker/runit/hadoop_dn-runner.sh /etc/sv/hadoop_dn/run
