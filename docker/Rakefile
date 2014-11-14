@@ -1,3 +1,9 @@
+require 'gorillib'
+require 'gorillib/model'
+require 'gorillib/array/wrap'
+require 'pry'
+require 'rake/file_utils.rb'
+
 DOCKER_USER = ENV['DOCKER_USER '] || 'bd4c'
 
 HADOOP_IMAGES = [
@@ -9,21 +15,60 @@ HADOOP_IMAGES = [
 HADOOP_CONTAINERS = [
   'hadoop_lounge',
   'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker',
-  'data_gold', 'data_outd', 'data_nn', 'data_hdfs0'
 ]
 
+DATA_CONTAINERS = {
+  data_gold:  { image: 'bd4c/data_gold',    volumes: ['/data/gold'],         },
+  data_outd:  { image: 'bd4c/volume_boxer', volumes: ['/data/gold'],         },
+  data_hdfs0: { image: 'bd4c/volume_boxer', volumes: ['/bulk/hadoop/hdfs'],  },
+  data_nn:    { image: 'bd4c/volume_boxer', volumes: ['/bulk/hadoop/name'],  },
+}
+
+CONTAINER = ENV['ctr'] || ENV['container']
+IMAGE     = ENV['img'] || ENV['img']
+
+namespace :data do
+  task(:run) do
+    ctr_name = CONTAINER || 'all'
+    names = DockerRunner.arg_or_all(ctr_name, DATA_CONTAINERS.keys)
+    names.each do |name|
+      opts = DATA_CONTAINERS[name.to_sym] or raise "Missing definition for container #{name}"
+      opts = opts.merge(name: name, interactive: false, entrypoint_args: ['pushpull', opts[:volumes].first])
+      opts[:ignore_errors] = true if ctr_name == 'all'
+      DockerRunner.run(opts)
+    end
+  end
+  task :create => :run
+  task(:delete_data ) do
+    containers = DockerRunner.arg_or_all(CONTAINER, DATA_CONTAINERS.keys)
+    DockerRunner.stop(containers, ignore_errors: true)
+    DockerRunner.rm(containers, ignore_errors: true)
+  end
+  task(:start_interactive){ DockerRunner.start(CONTAINER, interactive: true) }
+
+  task(:inspector => 'inspector:run')
+  namespace :inspector do
+    task(:run) do
+      DockerRunner.run(image: 'ubuntu', name: 'data_inspector', interactive: true, volumes_from: DATA_CONTAINERS.keys)
+    end
+    task(:delete) do
+      DockerRunner.stop('data_inspector', ignore_errors: true)
+      DockerRunner.rm('data_inspector', ignore_errors: true)
+    end
+  end
+end
 
 namespace :cluster do
   task :start do
-    sh "decking start dev"
+    sh "decking start cluster"
   end
 
   task :stop do
-    sh "decking stop dev"
+    sh "decking stop cluster"
   end
 
   task :create do
-    sh "decking create dev"
+    sh "decking create cluster"
   end
 
   task :kill     => [:stop, :rm_containers]
@@ -35,11 +80,7 @@ namespace :cluster do
   task :rm_containers do
     # args = `docker ps -a  | grep -e 'hadoop_|data_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
     args = HADOOP_CONTAINERS
-    if args.empty?
-      puts "No stopped containers to kill"
-    else
-      sh "docker rm #{args.join(" ")} ; true"
-    end
+    sh "docker rm #{args.join(" ")} ; true"
   end
 end
 
@@ -139,6 +180,36 @@ def human_to_bytes(num, units)
   (num.to_f * HUMAN_TO_BYTES[units]).to_i
 end
 
+class ParamList < Array
+  def dasherize(name)
+    name.to_s.gsub(/_/, '-')
+  end
+  def add_param(name, val)
+    self << "--#{dasherize(name)}=#{val.to_s}" if val.present?
+    self
+  end
+  def add_flag(str, val)
+    self << str.to_s if val.present?
+    self
+  end
+  def add_boolean(name, val)
+    self << "--#{dasherize(name)}" if val.present?
+    self
+  end
+
+  def add_string_params(names, opts)
+    names.each{|name| add_param(name, opts[name.to_sym]) }
+    self
+  end
+  def add_array_param(name, vals)
+    Array.wrap(vals).each do |val|
+      add_param(name, val)
+    end
+    self
+  end
+end
+
+
 class DockerImage
   # feae5a29ea12        About an hour ago   /bin/sh -c #(nop) COPY file:bb5fb02a76c6852b8   2.091 kB
   HISTORY_RE = /^([0-9a-f]+)\s+(.*?ago)\s+(.*?)\s+([0-9\.]+) (B|kB|MB|GB)$/
@@ -183,7 +254,8 @@ HADOOP_PORTS = {
 # open ssh ports at 9022, 9122, 9222, etc
 SSH_PORTS = {
   9022 => 'foyer-ssh', 9122 => 'worker-ssh', 9222 => 'hue-ssh', 9322 => 'rm-ssh', 9422 => 'nn-ssh',
-  9522 => 'snn-ssh',   9622 => nil, 10022 => 'deb-proxy-ssh', 10122 => nil, }
+  9522 => 'snn-ssh',   9622 => 'fiddle-ssh', 9722 => nil,      9822 => nil,
+  10022 => 'deb-proxy-ssh', 10122 => nil, 10222 => nil, }
 OTHER_PORTS  = { 10000 => 'deb-proxy' }
 
 def forward_ports(ports)
@@ -197,4 +269,79 @@ end
 def banner(str)
   puts( "\n  " + "*"*50 + "\n  *\n" )
   puts "  * #{str}\n  *\n"
+end
+
+module DockerRunner
+  extend self; # methods now callable with DockerRunner.foo as well
+  def expect_one(arg, opts={})
+    if arg.blank? || (arg.to_s == 'all')
+      abort "Please supply a single container name with 'ctr=name' (not 'all')"
+    end
+    arg
+  end
+
+  def arg_or_all(container, all)
+    if container.blank?
+      abort "Please supply a container name with 'ctr=name', or 'ctr=all' for all relevant containers"
+    end
+    container = all if container == 'all'
+    Array.wrap(container)
+  end
+
+  class Container
+    include Gorillib::Model
+    field :name,         String
+    field :volumes_from, String
+    field :volumes,      Array
+    field :links,        Array
+    field :ports,        Array
+    field :exposes,      Array
+    field :envs,         Array
+  end
+
+  def start(container, opts={})
+    expect_one(container)
+    params = ParamList.new.add_flag('-ia', opts[:interactive])
+    execute(*["docker", "start", *params, container], opts)
+  end
+
+  def stop(containers, opts={})
+    execute(*["docker", "stop", *Array.wrap(containers)], opts)
+  end
+
+  # remove the given containers
+  # @param containers [Array] container names to remove
+  def rm(containers, opts={})
+    execute("docker", "rm", *Array.wrap(containers), opts)
+  end
+
+  def run(opts)
+    raise(ArgumentError, "Need to supply an image: #{opts}") if opts[:image].to_s.blank?
+    params = ParamList.new
+    params.add_string_params([:name, :hostname, :entrypoint], opts)
+    params.add_array_param('volumes-from', opts[:volumes_from])
+    params.add_array_param('volume',       opts[:volumes])
+    params.add_array_param('link',         opts[:links])
+    params.add_array_param('publish',      opts[:ports])
+    params.add_array_param('expose',       opts[:exposes])
+    params.add_array_param('env',          opts[:envs])
+    params.add_boolean(    'detach',       opts[:detach])
+    params.add_flag(       '-it',          opts[:interactive])
+    #
+    params += opts[:other_flags] if opts[:other_flags].present?
+    params << opts[:image]
+    params += Array.wrap(opts[:entrypoint_args])
+    #
+    execute('docker', 'run', *params, opts)
+  end
+
+  def execute(*args, &block)
+    opts = args.extract_options!
+    args.map!(&:to_s)
+    Rake.sh(*args) do |ok, res|
+      if (not ok) && (not opts[:ignore_errors])
+        abort("Command #{args.join(' ')} exited unsuccessfully (#{res.exitstatus})")
+      end
+    end
+  end
 end

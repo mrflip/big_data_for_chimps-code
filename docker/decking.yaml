@@ -12,6 +12,7 @@ images:
   "bd4c/hadoop_solo":      "./img/hadoop_solo"
   #
   "bd4c/databox_archiver": "./img/datasets"
+  "bd4c/volume_boxer":     "./img/volume_boxer"
 
 # Containers to define. Options here correspond to common 'docker run' options.
 containers:
@@ -21,16 +22,24 @@ containers:
   # Data
   #
 
-  data_gold:  { mount: ["/data/gold"],        extra: "mirror /data/gold",        image: "bd4c/data_gold",        hostname: "data-gold" }
-  data_outd:  { mount: ["/data/outd"],        extra: "mirror /data/outd",        image: "bd4c/databox_archiver", hostname: "data-outd" }
-
-  data_nn:    { mount: ["/bulk/hadoop/name"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-nn" }
-  data_hdfs0: { mount: ["/bulk/hadoop/hdfs"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/databox_archiver", hostname: "data-hdfs0" }
-      
-  # "bd4c/hdfs_nn_data"
-  # "bd4c/hdfs_dn0_data"
-  # "bd4c/hadoop_solo":      "./img/hadoop_solo"
-
+  data_gold:  { mount: ["/data/gold"],        extra: "pushpull /data/gold",      image: "bd4c/data_gold" }
+  data_outd:  { mount: ["/data/outd"],        extra: "mirror /data/outd",        image: "bd4c/data_outd" }
+  
+  data_nn:    { mount: ["/bulk/hadoop/name"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/data_nn"    }
+  data_hdfs0: { mount: ["/bulk/hadoop/hdfs"], extra: "mirror /bulk/hadoop/hdfs", image: "bd4c/data_hdfs0" }
+  
+  # ===========================================================================
+  #
+  # Debugging
+  #
+  
+  fiddle:
+    image:        "bd4c/hadoop_base"
+    hostname:     "fiddle"
+    port:         [ "9622:22" ]
+    mount-from:
+      - "data_gold"
+  
   # ===========================================================================
   #
   # Hadoop machines
@@ -82,6 +91,8 @@ containers:
     mount:
       - "/var/lib/docker/hosts:/etc/hosts:ro"
       - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
+    mount-from:
+      - "data_hdfs0"
     hostname:     "worker"
 
   hadoop_rm:
@@ -101,6 +112,8 @@ containers:
     hostname:     "nn"
     # console http 50070; ipc 8020
     port:         [ "9422:22", "50070:50070", "8020:8020" ]
+    mount-from:
+      - data_nn
     mount:
        # dynamic /etc/hosts file
       - "/var/lib/docker/hosts:/etc/hosts:ro"
@@ -153,19 +166,17 @@ containers:
   mongo:          library/mongo
   
 clusters:
-  helpers:
-    - host_filer
-    - deb_proxy
-  dev:
-    - data_nn
-    - data_hdfs0
-    - data_outd
-    - data_gold
+  cluster:
     - hadoop_nn
     - hadoop_rm
     - hadoop_snn
     - hadoop_worker
     - hadoop_lounge
+  helpers:
+    - host_filer
+    - deb_proxy
+  admin:
+    - fiddle
   han:
     - hadoop_solo
 
