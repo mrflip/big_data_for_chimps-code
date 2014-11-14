@@ -26,7 +26,7 @@ HADOOP_CONTAINERS = [
 
 DATA_CONTAINERS = {
   data_gold:   { image: 'bd4c/data_gold',    volumes: ['/data/gold'],         },
-  data_outd:   { image: 'bd4c/data_outd',    volumes: ['/data/gold'],         },
+  data_outd:   { image: 'bd4c/data_outd',    volumes: ['/data/outd'],         },
   data_hdfs0:  { image: 'bd4c/data_hdfs0',   volumes: ['/bulk/hadoop/hdfs'],  },
   data_nn:     { image: 'bd4c/data_nn',      volumes: ['/bulk/hadoop/name'],  },
   home_chimpy: { image: 'bd4c/home_chimpy',  volumes: ['/home/chimpy'],  },
