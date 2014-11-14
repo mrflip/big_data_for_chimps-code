@@ -1,18 +1,6 @@
 # Images decking should create. Use these labels for the 'decking build'
 # command, or use 'all' to run all of them.
-images:
-  "bd4c/deb_proxy":        "./img/deb_proxy"
-  "bd4c/baseimage":        "./img/baseimage"
-  "bd4c/hadoop_base":      "./img/hadoop_base"
-  "bd4c/hadoop_nn":        "./img/hadoop_nn"
-  "bd4c/hadoop_rm":        "./img/hadoop_rm"
-  "bd4c/hadoop_snn":       "./img/hadoop_snn"
-  "bd4c/hadoop_worker":    "./img/hadoop_worker"
-  "bd4c/hadoop_lounge":    "./img/hadoop_lounge"
-  # "bd4c/hadoop_solo":      "./img/hadoop_solo"
-  #
-  # "bd4c/databox_archiver": "./img/datasets"
-  "bd4c/volume_boxer":     "./img/volume_boxer"
+images: {}
 
 # Containers to define. Options here correspond to common 'docker run' options.
 containers:
@@ -22,25 +10,13 @@ containers:
   # Data
   #
 
-  data_gold:  { mount: ["/data/gold"],        extra: "pushpull /data/gold",        image: "bd4c/data_gold" }
-  data_outd:  { mount: ["/data/outd"],        extra: "pushpull /data/outd",        image: "bd4c/data_outd" }
+  data_gold:  { mount: ["/data/gold"],        extra: "pushpull /data/gold",        image: "bd4c/data_gold"  }
+  data_outd:  { mount: ["/data/outd"],        extra: "pushpull /data/outd",        image: "bd4c/data_outd"  }
   
   data_nn:    { mount: ["/bulk/hadoop/name"], extra: "pushpull /bulk/hadoop/name", image: "bd4c/data_nn"    }
   data_hdfs0: { mount: ["/bulk/hadoop/hdfs"], extra: "pushpull /bulk/hadoop/hdfs", image: "bd4c/data_hdfs0" }
 
   home_chimpy: { mount: ["/home/chimpy"],     extra: "pushpull /bulk/hadoop/hdfs", image: "bd4c/home_chimpy" }
-  
-  # ===========================================================================
-  #
-  # Debugging
-  #
-  
-  fiddle:
-    image:        "bd4c/hadoop_base"
-    hostname:     "fiddle"
-    port:         [ "9622:22" ]
-    mount-from:
-      - "data_gold"
   
   # ===========================================================================
   #
@@ -66,16 +42,6 @@ containers:
       - "hadoop_nn:nn"
       - "hadoop_rm:nn"
       - "hadoop_worker:worker"
-
-  hadoop_solo:
-    image:        "bd4c/hadoop_solo"
-    # node mgr:  console http 8042, localizer 8040, ipc 8041
-    # data node: console http 50075, ipc 50020, xceiver 50010
-    # 8040, 8041, 50020, 50010, 8030, 8031, 8032, 8033, 13562, 10020, 10033, 8020, 50090
-    port:         [ "9922:22", "9001:9001", "9002:50070", "9003:8088", "9004:8042", "9905:50075", "9906:19888"  ]
-    mount:
-      - "/tmp/solo/hadoop/log:/bulk/hadoop/log:rw"
-    hostname:     "solo"
 
   #
   # TODO: We have hardcoded port mappings to the docker host, which is
@@ -133,11 +99,15 @@ containers:
       - "/var/lib/docker/hosts:/etc/hosts:ro"
       - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
-  # Zookeeper   -- client 2181, ipc 2888, election 3888, JMX 9010, failover 8019
-  # Httpfs      -- admin 14001, rest 14000
-  # Journalnode -- 8480, 8485,
-  # HDFS-NFS    -- gateway 2049, mountd 4242, portmap 111
-  # Failover    -- 8018
+  # hadoop_solo:
+  #   image:        "bd4c/hadoop_solo"
+  #   # node mgr:  console http 8042, localizer 8040, ipc 8041
+  #   # data node: console http 50075, ipc 50020, xceiver 50010
+  #   # 8040, 8041, 50020, 50010, 8030, 8031, 8032, 8033, 13562, 10020, 10033, 8020, 50090
+  #   port:         [ "9922:22", "9001:9001", "9002:50070", "9003:8088", "9004:8042", "9905:50075", "9906:19888"  ]
+  #   mount:
+  #     - "/tmp/solo/hadoop/log:/bulk/hadoop/log:rw"
+  #   hostname:     "solo"
 
   #
   # Helper images
@@ -150,25 +120,25 @@ containers:
       - "/var/lib/docker/hosts:/srv/hosts"
       - "/var/run/docker.sock:/var/run/docker.sock"
     hostname:     "host-filer"
-    
-  # These containers have a directory given in "images" above, so they are built
-  # locally from the corresponding Dockerfile
-  deb_proxy:
-    # # name of the image to use
-    image:        "bd4c/deb_proxy"
-    port:         [ "10122:22", "10001:10001" ]
-    mount:        ["/tmp/deb_proxy:/bulk/deb_proxy"]
-    hostname:     "deb-proxy"
-
+  
+  # ===========================================================================
   #
-  # Haven't tested these
+  # Debugging
   #
   
-  elasticsearch:  dockerfile/elasticsearch
-  mysql:          library/mysql
-  mongo:          library/mongo
+  fiddle:
+    image:        "bd4c/hadoop_base"
+    hostname:     "fiddle"
+    port:         [ "9622:22" ]
+    mount-from:
+      - "data_gold"
   
 clusters:
+  data:
+    - data_nn
+    - data_hdfs0
+    - data_gold
+    - data_outd
   cluster:
     - hadoop_nn
     - hadoop_rm
@@ -177,10 +147,9 @@ clusters:
     - hadoop_lounge
   helpers:
     - host_filer
-    - deb_proxy
   admin:
     - fiddle
-  han:
-    - hadoop_solo
+  # han:
+  #   - hadoop_solo
 
 groups: {}

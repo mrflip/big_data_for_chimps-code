@@ -2,10 +2,8 @@
 # TODO -- don't use bd4c/baseimage
 # (using for now so I don't have to think)
 #
-FROM       radial/busyboxplus:git
+FROM       debian:stable
 MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
-
-ENV  ARCHIVE /archiver/archive.git
 
 #
 # This is meant to be used as a data-only container:
@@ -16,18 +14,22 @@ ENV  ARCHIVE /archiver/archive.git
 # of parallel shadow universe. Help is on the way, so we have chosen the
 # following workaround.
 #
-# This container has a directory called /archive and a directory called /data.
+# This container has a directory called /boxer/archive and a directory called /data.
 #
 # * Run with no args is the same as '--copyonce'
 # * `--force-unpack` --
 # * `--create`       -- if the '.unpacked' tombstone
 # * `--archive`      --
 
-COPY img/datasets/conf/archiver.sh   /bin/
-COPY img/datasets/README-archiver.md /archiver/README.md
-COPY img/datasets/setup-archiver.sh  /tmp/
+RUN \
+  apt-get update                                   && \
+  apt-get install -y --no-install-recommends rsync nano && \
+  rm -rf /var/lib/apt/lists/*
 
-RUN  /tmp/setup-archiver.sh
+COPY img/volume_boxer/boxer/   /boxer/
 
-ENTRYPOINT ["/bin/archiver.sh"]
-CMD ["mirror", "/data"]
+RUN  \
+  mkdir /boxer/archive                             && \
+  ls -l /boxer
+
+ENTRYPOINT ["/boxer/boxer.sh"]
