@@ -29,7 +29,7 @@ DATA_CONTAINERS = {
   data_outd:   { image: 'bd4c/data_outd',    volumes: ['/data/gold'],         },
   data_hdfs0:  { image: 'bd4c/data_hdfs0',   volumes: ['/bulk/hadoop/hdfs'],  },
   data_nn:     { image: 'bd4c/data_nn',      volumes: ['/bulk/hadoop/name'],  },
-  home_chimpy: { image: 'bd4c/home_chimpy',  volumes: ['/chimpy/home'],  },
+  home_chimpy: { image: 'bd4c/home_chimpy',  volumes: ['/home/chimpy'],  },
 }
 
 CONTAINER = ENV['ctr'] || ENV['container']

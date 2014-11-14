@@ -9,6 +9,11 @@ echo "* We depend on you to restrict access to the machine that holds these cont
 echo "*"
 echo "************"
 
+# # Should we lay in a git identity we can use for commits?
+# #
+# git config --global user.email "nobody@bigdataforchimps.com"
+# git config --global user.name "bd4c/datasets_archive docker archive robot"
+
 deluser chimpy || true
 
 # Add user, set default password

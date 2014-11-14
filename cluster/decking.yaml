@@ -37,6 +37,7 @@ containers:
     mount-from:
       - "data_gold"
       - "data_outd"
+      - "home_chimpy"
     dependencies:
       - "hadoop_nn:nn"
       - "hadoop_rm:nn"

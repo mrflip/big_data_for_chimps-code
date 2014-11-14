@@ -22,6 +22,7 @@ Everything below (apart from one quick step) should take place in the `bd4c-code
 * Boot2Docker, if you're on OSX
 * Ruby with rake
 * Node with npm
+* Basic comfort pasting things into a terminal window and hitting enter.
 
 ### Running under boot2docker
 
@@ -118,7 +119,7 @@ You're ready to proceed when:
 * Running `rake docker:pull` marches through the list fairly quickly, reporting in a bored tone that it already has everything.
 * On the docker host, `ls -l /var/lib/docker/hosts` shows a file of zero size.
 * Running `decking` (with no args) reports '`Version: 0.2.1-bd4c`'
-* Running `docker ps -a` shows no containers running.
+* Running `rake docker:ps` shows no containers running.
 
 Alright! Now the fun starts.
 
@@ -133,7 +134,7 @@ rake docker:helpers
 If everything works, these things will be true:
 
 * Running `cat /var/lib/docker/hosts` (which was empty just moments ago!) will have all sorts of nice information in it, including an entry for 'host-filer'
-* Running `docker ps` shows containers for `host_filer`
+* Running `rake docker:ps` shows containers for `host_filer`
 
 ### Instantiate the data containers
 
@@ -145,7 +146,7 @@ rake data:create
 
 A torrent of filenames will fly by on the screen as the containers copy data from their internal archive onto the shared volumes the cluster will use. `data_gold`, the filesystem-local version of the data, will have directories about sports, text, airlines and ufos. `data_outd`, for output data, will be empty (that's your job, to fill it). `data_hdfs0` will be a long streak of things in `current/` with large integers in their name. The contents of `data_nn` are tiny but so-very-precious: it's the directory that makes sense of all those meaningless filenames from the data node. Lastly, the `home_chimpy` volume will have a lot of git and pig and ruby and asciidoc files. It's what you paid the big bucks for right there: the code and the book.
 
-At this point, running `rake docker:ps` will show five containers (`data_{nn,hdfs0,gold,outd}` and `home_chimpy`), all in the stopped stated. Wait, what? Yes, these are supposed to be in the stopped state -- all they do is anchor the data through docker magic. That also means they don't appear if you run `docker ps` -- you have to run `docker ps -a` to see them.
+At this point, running `rake docker:ps` will show five containers (`data_{nn,hdfs0,gold,outd}` and `home_chimpy`), all in the stopped stated. Wait, what? Yes, these are supposed to be in the stopped state -- all they do is anchor the data through docker magic. That also means they don't appear if you run `docker ps` -- you have to run `docker ps -a` to see them (that's why we tell you to run `rake docker:ps`, which includes this flag by default).
 
 ### Ready the cluster
 
@@ -180,16 +181,58 @@ If things have worked, and you took our advice to set up port forwarding, you'll
 
 The friendly Hue console will be available at http://DOCKER_IP:9001/ in your browser (substitute the ip address of your docker). The login and password are 'chimpy' and 'chimpy'. (Ignore any whining it does about Oozie or Pig not working -- those are just front-end components we haven't installed)
 
-* you can ssh to the lounge with `ssh -i insecure_key.pem chimpy@$DOCKER_IP -p 9022`
+* Visit the File Browser and drill down to http://$DOCKER_IP:9001/filebrowser/#/data/gold  You'll see all the different datasets we'll use. There's lots of fun stuff in there -- finishing the book will leave you ready to design your own investigations, and so we've provided lots of territory to explore.
+* Visit the Job Browser. Nothing going on yet, of course, but you'll be back here in a moment.
+
+#### SSH terminal access
+
+You will also spend some time commanding a terminal directly on the machine. Even if you're not one of the many people who prefer the commandline way, in the later chapters you'll want to peek under the covers of what's going on within each of the machines. SSH across by running
+
+```
+ssh -i insecure_key.pem chimpy@$DOCKER_IP -p 9022
+```
+
+All of the nodes in the cluster are available for ssh. Using the normal SSH port of 22 as a mnemonic, we've set each container up in ascending centuries:
+
+* Lounge:	      9022
+* Worker:	      9122
+* Resource Manager:   9322 (manages but does not run jobs -- the new-school jobtracker)
+* Namenode:	      9422 (manages but does not hold data)
+* Secondary Namenode: 9522 (keeps the namenode healthy. Does *not* act as a failover namenode)
+
+9222 is reserved for a second worker, if you have the capacity.
+
+#### The dangerous thing we did that you need to know about
+
+We've done something here that usually violates taste, reason and safety: the private key that controls access to the container is available to anyone with a browse. To bring that point home, the key is named `insecure_key.pem`. Our justification is that these machines are (a) designed to work within the private confines of a VM, without direct inbound access from the internet, and (b) are low-stakes playgrounds with only publicly redistributable code and data sets. If either of those assumptions becomes untrue -- you are pushing to the docker cloud, or using these machines to work with data of your own, or whatever -- then we urge you to construct new private/public keypairs specific _only_ to each machine, replacing the `/root/.ssh/authorized_keys` and `/home/chimpy/.ssh/authorized_keys` files. (It's those latter files that grant access; the existing key must be removed and a new one added to retain access.) It's essential that any private keys you generate be unique to these machines: it's too easy to ship a container to the wrong place or with the wrong visibility at the current maturity of these tools. So don't push in the same key you use for accessing work servers or github or docker or the control network for your secret offshore commando HQ. 
+
+## I WANT TO SEE DATA GO, YOU PROMISED
+
+Right you are. There's tons of examples in the book, of course, but let's make some data fly.
+
+### See pig in action
+
+```
+$ pig
+   # from the grunt shell
+words = LOAD '/user/root/words_to_sort' AS ww:chararray; wo = ORDER words BY ww; STORE wo INTO './sorted_words';
+```
+
+View the output:
+
+```
+hadoop fs -cat /data/outd/ufos/sightings_hist/\*
+```
 
 
+## Other
 
 #### Troubleshooting
 
 * http://localhost:50070/dfshealth.html#tab-datanode opens an returns content (Yay the namenode is working)
 * http://localhost:8088/cluster/nodes
 
-* `docker ps` should show
+* `rake docker:ps` should show
 
 ```
 CONTAINER ID        IMAGE                        COMMAND                CREATED             STATUS              PORTS                                                              NAMES
@@ -216,19 +259,6 @@ d12d0b71c978        d303575ad9a7                 "/bin/sh -c /build/h   2 hours 
 
 
 ## Troubleshooting
-
-### SSH access
-
-```
-ssh -i insecure_key.pem root@localhost -p 9122
-```
-
-* Client:	      9022
-* Worker:	      9122
-* Hue:		      9222
-* Resource Manager:   9322 (manages but does not run jobs -- the new-school jobtracker)
-* Namenode:	      9422 (manages but does not hold data)
-* Secondary Namenode: 9522 (keeps the cluster healthy. Does *not* act as a failover namenode)
 
 
 ### Example job
