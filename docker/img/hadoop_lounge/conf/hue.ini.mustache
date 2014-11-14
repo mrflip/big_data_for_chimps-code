@@ -22,7 +22,7 @@
 
   # Webserver listens on this address and port
   http_host=0.0.0.0
-  http_port=8888
+  http_port=9001
 
   # Time zone name
   time_zone=America/Los_Angeles
@@ -95,7 +95,7 @@
 
   # Comma separated list of apps to not load at server startup.
   # e.g.: pig,zookeeper
-  app_blacklist=spark
+  app_blacklist=spark,impala,beeswax,hbase,ssqoop
 
   # The directory where to store the auditing logs. Auditing is disable if the value is empty.
   # e.g. /var/log/hue/audit.log
@@ -291,7 +291,7 @@
   # ------------------------------------------------------------------------
   [[database]]
     engine=sqlite3
-    name=/var/lib/hue/desktop.db
+    name={{HUE_DATA_DIR}}/desktop.db
     # Database engine is typically one of:
     # postgresql_psycopg2, mysql, sqlite3 or oracle.
     #
@@ -761,10 +761,10 @@
 
 [pig]
   # Location of piggybank.jar on local filesystem.
-  ## local_sample_dir=/usr/share/hue/apps/pig/examples
+  local_sample_dir=/usr/lib/hue/apps/pig/examples/
 
   # Location piggybank.jar will be copied to in HDFS.
-  ## remote_data_dir=/user/hue/pig/examples
+  remote_data_dir=/user/hue/pig/examples
 
 
 ###########################################################################

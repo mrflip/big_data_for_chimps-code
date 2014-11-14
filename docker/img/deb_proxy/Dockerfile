@@ -19,6 +19,9 @@ RUN \
   echo 0.0.0.0/32 >> /etc/squid-deb-proxy/allowed-networks-src.acl.d/10-default && \
   mkdir -p /bulk/deb_proxy/log /bulk/deb_proxy/cache && \
   chmod +x /etc/squid-deb-proxy/start.sh 
+
+# !!! Do we keep this, or leave it?
+RUN /usr/sbin/enable_insecure_key && /etc/my_init.d/00_regen_ssh_host_keys.sh
   
 ENTRYPOINT ["/etc/squid-deb-proxy/start.sh"]
 

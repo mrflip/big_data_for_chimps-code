@@ -9,8 +9,15 @@ DOCKER_USER = ENV['DOCKER_USER '] || 'bd4c'
 HADOOP_IMAGES = [
   'baseimage', 'hadoop_base',
   'hadoop_lounge',
-  'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker'
+  'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker',
 ].map{|slug| "#{DOCKER_USER}/#{slug}" }
+
+DATA_IMAGES = [
+  'data_gold', 'data_outd', 'data_nn', 'data_hdfs0',
+  'home_chimpy', 'volume_boxer',
+].map{|slug| "#{DOCKER_USER}/#{slug}" }
+
+ALL_IMAGES = [ 'blalor/docker-hosts', 'phusion/baseimage:0.9.15', 'busybox' ] + HADOOP_IMAGES + DATA_IMAGES
 
 HADOOP_CONTAINERS = [
   'hadoop_lounge',
@@ -18,10 +25,11 @@ HADOOP_CONTAINERS = [
 ]
 
 DATA_CONTAINERS = {
-  data_gold:  { image: 'bd4c/data_gold',    volumes: ['/data/gold'],         },
-  data_outd:  { image: 'bd4c/volume_boxer', volumes: ['/data/gold'],         },
-  data_hdfs0: { image: 'bd4c/volume_boxer', volumes: ['/bulk/hadoop/hdfs'],  },
-  data_nn:    { image: 'bd4c/volume_boxer', volumes: ['/bulk/hadoop/name'],  },
+  data_gold:   { image: 'bd4c/data_gold',    volumes: ['/data/gold'],         },
+  data_outd:   { image: 'bd4c/data_outd',    volumes: ['/data/gold'],         },
+  data_hdfs0:  { image: 'bd4c/data_hdfs0',   volumes: ['/bulk/hadoop/hdfs'],  },
+  data_nn:     { image: 'bd4c/data_nn',      volumes: ['/bulk/hadoop/name'],  },
+  home_chimpy: { image: 'bd4c/home_chimpy',  volumes: ['/chimpy/home'],  },
 }
 
 CONTAINER = ENV['ctr'] || ENV['container']
@@ -78,7 +86,6 @@ namespace :cluster do
   task :recycle  => ['docker:build', :kill, :create, :start]
 
   task :rm_containers do
-    # args = `docker ps -a  | grep -e 'hadoop_|data_' | egrep -v ' Up ' | cut -c 1-12`.gsub(/[\r\n]/, " ")
     args = HADOOP_CONTAINERS
     sh "docker rm #{args.join(" ")} ; true"
   end
@@ -106,14 +113,14 @@ namespace :docker do
   end
 
   task :pull do
-    HADOOP_IMAGES.each do |img_name|
+    ALL_IMAGES.each do |img_name|
       banner("Pull #{img_name} -- this can take a stupidly long time")
       sh("docker pull #{img_name}")
     end
   end
 
   task :push do
-    HADOOP_IMAGES.each do |img_name|
+    (HADOOP_IMAGES + DATA_IMAGES).each do |img_name|
       banner("Push #{img_name} -- this can take a stupidly long time, and you have to be part of the bd4c org for it to work")
       sh("docker push #{img_name}")
     end

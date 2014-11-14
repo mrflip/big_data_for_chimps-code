@@ -5,14 +5,11 @@ set -e ; set -v
 #
 mkdir -p $HADOOP_LOG_DIR/pig-app
 mkdir -p $HADOOP_LOG_DIR/hive-app
-mkdir -p $HADOOP_LOG_DIR/hue-app
 
 ln -snf $HADOOP_LOG_DIR/pig-app  /var/log/pig
 ln -snf $HADOOP_LOG_DIR/hive-app /var/log/hive
-ln -snf $HADOOP_LOG_DIR/hue-app  /var/log/hue
 
 chown hive:hive $HADOOP_LOG_DIR/hive-app
-chown hue:hue   $HADOOP_LOG_DIR/hue-app
 
 # Hadoop client basics
 #
@@ -30,10 +27,3 @@ $safe_apt_install hive-hcatalog hive-webhcat hive-webhcat-server
 # Hadoop Hue -- pretty front-end to hadoop
 #
 $safe_apt_install hue
-
-# broken.
-# # The standard BSD words file, which is nice to have
-# /usr/share/debconf/fix_db.pl
-# $safe_apt_install --force-yes wamerican-huge
-
-# $safe_apt_install apt-file
