@@ -8,8 +8,8 @@ DOCKER_USER = ENV['DOCKER_USER '] || 'bd4c'
 
 HADOOP_IMAGES = [
   'baseimage', 'hadoop_base',
-  'hadoop_lounge',
   'hadoop_nn', 'hadoop_rm', 'hadoop_snn', 'hadoop_worker',
+  'hadoop_lounge',
 ].map{|slug| "#{DOCKER_USER}/#{slug}" }
 
 DATA_IMAGES = [

@@ -208,48 +208,78 @@ We've done something here that usually violates taste, reason and safety: the pr
 
 ## I WANT TO SEE DATA GO, YOU PROMISED
 
-Right you are. There's tons of examples in the book, of course, but let's make some data fly.
+Right you are. There's tons of examples in the book, of course, but let's make some data fly now and worry about the details later.
 
 ### See pig in action
 
-```
-$ pig
-   # from the grunt shell
-words = LOAD '/user/root/words_to_sort' AS ww:chararray; wo = ORDER words BY ww; STORE wo INTO './sorted_words';
-```
-
-View the output:
+On hadoop:
 
 ```
-hadoop fs -cat /data/outd/ufos/sightings_hist/\*
+  # This file isn't on the HDFS right now, so put it there:
+hadoop fs -mkdir -p /data/gold/geo/ufo_sightings
+hadoop fs -put      /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2 /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2
+  # Run, pig, run!
+pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
+  # See the output:
+hadoop fs -cat /data/outd/ufos/sightings_hist/\* > /tmp/sightings_hist.tsv
+  # Whadday know, they're the same!
+colordiff -uw /data/outd/ufos/sightings_hist-reference.tsv /tmp/sightings_hist.tsv | echo 'No diffference'
+```
+
+Locally!
+
+```
+  # execute all examples from the code directory (i.e. not the one holding the file)
+  # also note that at this moment you are running someting in ~book/code (book repo) and not ~/code
+cd book/code
+  # Need to remove the output directory -- check that there's nothing in it, then remove it
+ls /data/outd/ufos/sightings_hist 
+rm -rf /data/outd/ufos/sightings_hist
+  # Run, pig, run
+pig -x local 04-intro_to_pig/a-ufo_visits_by_month.pig 
+   # Look ma, just what we predicted!
+colordiff -uw /data/outd/ufos/sightings_hist{-reference.tsv,/part*} | echo 'No diffference'
 ```
 
 
 ## Other
 
-#### Troubleshooting
+### Signs of health
+
+#### Is the cluster on, and with data?
+
+
+
+#### Is the namenode working?
 
 * http://localhost:50070/dfshealth.html#tab-datanode opens an returns content (Yay the namenode is working)
 * http://localhost:8088/cluster/nodes
 
 * `rake docker:ps` should show
 
+
+
+### Datanode working?
+
+On the worker machine:
+
+* `elinks http://$(hostname):50075/` loads, shows you 'DataNode on'
+
+
+## Troubleshooting
+
+
+### Example Straight-Hadoop job
+
+If the machines seem to be working, and the daemons seem to be running, this is a test of whether Hadoop works
+
 ```
-CONTAINER ID        IMAGE                        COMMAND                CREATED             STATUS              PORTS                                                              NAMES
-49dd3fe748d9        bd4c/deb_proxy:latest        "/bin/bash"            27 minutes ago      Up 27 minutes       10000/tcp                                                          prickly_bell
-679312a500aa        blalor/docker-hosts:latest   "/usr/local/bin/dock   42 minutes ago      Up 42 minutes                                                                          host_filer.helpers
-1402f23d9b21        da9ce761dafe                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          8020/tcp, 50070/tcp, 50470/tcp                                     mad_shockley
-1e05506b89e4        9adb17f09b14                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          50070/tcp, 50470/tcp, 8020/tcp                                     grave_kirch
-40e667173e6a        9adb17f09b14                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          8020/tcp, 50070/tcp, 50470/tcp                                     hopeful_darwin
-994664c60827        b5b80f1fd5e2                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          8020/tcp, 50070/tcp, 50470/tcp                                     romantic_yonath
-d12d0b71c978        d303575ad9a7                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          50470/tcp, 8020/tcp, 50070/tcp                                     elegant_yonath
-8a269c0a917d        c0694ac34979                 "/bin/sh -c /build/h   2 hours ago         Up 2 hours          50070/tcp, 50470/tcp, 8020/tcp                                     suspicious_bartik
-6845ab5c4708        blalor/docker-hosts:latest   "/usr/local/bin/dock   19 hours ago        Up 19 hours                                                                            host_filer.helper
-23d75487641b        b8141723fa03                 "/etc/squid-deb-prox   19 hours ago        Up 19 hours         443/tcp, 80/tcp, 0.0.0.0:10000->10000/tcp, 0.0.0.0:10022->22/tcp   deb_proxy.helper
+hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
 ```
 
 
-### Utilities
+
+## Docker stuff
 
 `rake -P` will list all the things rake knows how to do
 
@@ -258,29 +288,14 @@ d12d0b71c978        d303575ad9a7                 "/bin/sh -c /build/h   2 hours 
 * `rake docker:rmi_all    `-- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate stages of old builds and left unchecked they will buil This command will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
 
 
-## Troubleshooting
-
-
-### Example job
 
 ```
-hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
-```
-
-### Datanode working?
-
-On the worker machine:
-
-* `elinks http://$(hostname):50075/` loads, shows you 'DataNode on'
-*
-
-
-```
-docker run				      \
-  -p 9122:22 -p 8042:8042 -p 50075:50075      \
-  -v /tmp/bulk/hadoop/log:/bulk/hadoop/log:rw \
-  --link hadoop_rm:rm --link hadoop_nn:nn     \
-  --rm -it bd4c/hadoop_worker		      \
-  --name hadoop_worker.tmp
+    docker run				      \
+      -p 9122:22 -p 8042:8042 -p 50075:50075      \
+      -v /tmp/bulk/hadoop/log:/bulk/hadoop/log:rw \
+      --volumes-from /data_hdfs0                  \
+      --link hadoop_rm:rm --link hadoop_nn:nn     \
+      --rm -it bd4c/hadoop_worker		      \
+      --name hadoop_worker.tmp
 
 ```
