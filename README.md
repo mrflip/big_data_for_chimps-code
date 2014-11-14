@@ -20,7 +20,7 @@ Everything below (apart from one quick step) should take place in the `bd4c-code
 
 * Docker
 * Boot2Docker, if you're on OSX
-* Ruby with rake
+* Ruby with rake, and the pry gem
 * Node with npm
 * Basic comfort pasting things into a terminal window and hitting enter.
 
