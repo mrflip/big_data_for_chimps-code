@@ -3,6 +3,7 @@
 OK if you do a docker pull on mrflip/datasets:0.02 you will get a docker image with the data in it. I also pushed the other images as bd4c/hadoop_nn, etc -- but they should build clean too.
 
 ```
+cd docker
 rake docker:pull
 ```
 
