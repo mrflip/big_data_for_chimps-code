@@ -24,6 +24,7 @@ containers:
   data_gold:  { mount: ["/data/gold"],        extra: "pushpull /data/gold",        image: "bd4c/data_gold" }
   data_outd:  { mount: ["/data/outd"],        extra: "pushpull /data/outd",        image: "bd4c/data_outd" }
   
+  data_hue:   { mount: ["/bulk/hadoop/hue"],  extra: "pushpull /bulk/hadoop/hue",  image: "bd4c/data_hue" }
   data_nn:    { mount: ["/bulk/hadoop/name"], extra: "pushpull /bulk/hadoop/name", image: "bd4c/data_nn"    }
   data_hdfs0: { mount: ["/bulk/hadoop/hdfs"], extra: "pushpull /bulk/hadoop/hdfs", image: "bd4c/data_hdfs0" }
 
@@ -63,7 +64,7 @@ containers:
       - "home_chimpy"
     dependencies:
       - "hadoop_nn:nn"
-      - "hadoop_rm:nn"
+      - "hadoop_rm:rm"
       - "hadoop_worker:worker"
 
   hadoop_solo:

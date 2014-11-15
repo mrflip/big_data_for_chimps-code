@@ -1,0 +1,27 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    coderay (1.1.0)
+    configliere (0.4.22)
+      highline (= 1.5.2)
+      multi_json (~> 1.10.1)
+    gorillib (0.6.0)
+      configliere (>= 0.4.13)
+      multi_json (>= 1.1)
+    highline (1.5.2)
+    method_source (0.8.2)
+    multi_json (1.10.1)
+    pry (0.10.1)
+      coderay (~> 1.1.0)
+      method_source (~> 0.8.1)
+      slop (~> 3.4)
+    rake (10.3.2)
+    slop (3.6.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  gorillib
+  pry
+  rake

@@ -1,4 +1,34 @@
 
+### Install decking
+
+Clusters are defined using [decking](http://decking.io), a Node.js tool to create, manage and run clusters of Docker containers, as well as some rake scripts we've assembled.
+
+Install:
+
+```
+  # do this from the top-level of the repo
+cd bd4c-code
+git submodule init
+git submodule update
+  # vendor/decking should now have contents
+ls vendor/decking
+  # letting you perform the install
+( cd vendor/decking && npm install -g )
+  # go back to the docker playspace
+cd cluster/ 
+```
+
+You must use _only the version given_ -- the npm remote one will not work.
+
+### Helpful tweaks to the boot2docker docker host
+
+Helpful tools:
+
+```
+tce-load -wi nano.tcz
+```
+
+### ...
 
 ```
 tail -F -n 10000 /bulk/log/hadoop/namenode-daemon/current

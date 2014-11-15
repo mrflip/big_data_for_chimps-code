@@ -1,0 +1,122 @@
+# clusters
+clusters:
+  
+  # ===========================================================================
+  #
+  # Data
+  #
+  
+  data:
+    data_gold:   { volumes: ["/data/gold"],        entry_args: ["pushpull", "/data/gold"],        image_name: "bd4c/data_gold"  }
+    data_outd:   { volumes: ["/data/outd"],        entry_args: ["pushpull", "/data/outd"],        image_name: "bd4c/data_outd"  }
+    data_hue:    { volumes: ["/bulk/hadoop/hue"],  entry_args: ["pushpull", "/bulk/hadoop/hue"],  image_name: "bd4c/data_hue"   }
+    data_nn:     { volumes: ["/bulk/hadoop/name"], entry_args: ["pushpull", "/bulk/hadoop/name"], image_name: "bd4c/data_nn"    }
+    data_hdfs0:  { volumes: ["/bulk/hadoop/hdfs"], entry_args: ["pushpull", "/bulk/hadoop/hdfs"], image_name: "bd4c/data_hdfs0" }
+    home_chimpy: { volumes: ["/home/chimpy"],      entry_args: ["pushpull", "/home/chimpy"],      image_name: "bd4c/home_chimpy" }
+  
+  # ===========================================================================
+  #
+  # Hadoop machines
+  #
+  # Remember that these must be in order you want them started
+  #
+  hadoop:
+    - name:         hadoop_nn
+      image_name:   "bd4c/hadoop_nn"
+      hostname:     "nn"
+      # console http 50070; ipc 8020
+      ports:         [ "9422:22", "50070:50070", "8020:8020" ]
+      volumes_from:
+        - data_nn
+      volumes:
+         # dynamic /etc/hosts file
+        - "/var/lib/docker/hosts:/etc/hosts:ro"
+        - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
+    
+    - name:         hadoop_snn
+      image_name:   "bd4c/hadoop_snn"
+      hostname:     "snn"
+      # checkpoint api http 50090
+      ports:         [ "9522:22", 50090 ]
+      links:
+        - "hadoop_nn:nn"
+      volumes:
+        - "/var/lib/docker/hosts:/etc/hosts:ro"
+        - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
+
+    - name:         hadoop_rm
+      image_name:   "bd4c/hadoop_rm"
+      hostname:     "rm"
+      # rsrc mgr: console http 8088; scheduler 8030; tracker 8031; ipc 8032; admin 8033, shuffle 13562;
+      # history:  console 19888 / https 19890, ipc 10020, admin 10033
+      ports:         [ "9322:22", "8088:8088", "8030:8030", "8031:8031", "8032:8032", "8033:8033", "13562:13562", "19888:19888", "10020:10020", "10033:10033" ]
+      links:
+        - "hadoop_nn:nn"
+      volumes:
+        - "/var/lib/docker/hosts:/etc/hosts:ro"
+        - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
+
+    #
+    # TODO: We have hardcoded port mappings to the docker host, which is
+    # convenient. It also however forces us to have a one-worker-only cluster.
+    # Make it be one hero worker and a pool of 0..n anonymous workers (or just a
+    # sea of anonymous workers)
+    #
+    - name:         hadoop_worker
+      image_name:   "bd4c/hadoop_worker"
+      # node mgr:  console http 8042, localizer 8040, ipc 8041
+      # data node: console http 50075, ipc 50020, xceiver 50010
+      ports:         [ "9122:22", "8042:8042", "50075:50075", 8040, 8041, 50020, 50010 ]
+      links:
+        - "hadoop_nn:nn"
+        - "hadoop_rm:rm"
+      volumes:
+        - "/var/lib/docker/hosts:/etc/hosts:ro"
+        - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
+      volumes_from:
+        - "data_hdfs0"
+      hostname:     "worker"
+
+    #
+    # Running hue on the lounge so that there's only one URL users need to learn.
+    #
+    - name:         hadoop_lounge
+      image_name:   "bd4c/hadoop_lounge"
+      hostname:     "lounge"
+      ports:         [ "9022:22", "9001:9001" ]
+      volumes:
+        - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
+      volumes_from:
+        - "data_gold"
+        - "data_outd"
+        - "home_chimpy"
+        - "data_hue"
+      links:
+        - "hadoop_nn:nn"
+        - "hadoop_rm:rm"
+        - "hadoop_worker:worker"
+    
+    #
+    # Helper images
+    #
+  helpers:
+    - name:        host_filer
+      image_name:  "blalor/docker-hosts"
+      entry_args:  ["/srv/hosts"]
+      volumes:
+        - "/var/lib/docker/hosts:/srv/hosts"
+        - "/var/run/docker.sock:/var/run/docker.sock"
+      hostname:     "host-filer"
+      
+  # ===========================================================================
+  #
+  # Debugging
+  #
+  debug:    
+    - name:         fiddle
+      image_name:   "bd4c/hadoop_base"
+      hostname:     "fiddle"
+      ports:         [ "9622:22" ]
+      volumes_from:
+        - "data_gold"
+
