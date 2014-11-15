@@ -85,7 +85,10 @@ module Rucker
     def to_hash ; clxn.dup  ; end
 
     # iterate over each value in the collection
-    def each(&block); each_value(&block) ; end
+    def each(&blk); each_value(&blk) ; end
+
+    # iterate over each value in the collection
+    def map(*args, &blk) values.map(*args, &blk) ; end
 
     # Adds item, returning the collection itself.
     # @return [Gorillib::Collection] the collection
