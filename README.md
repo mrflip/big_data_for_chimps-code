@@ -20,8 +20,7 @@ Everything below (apart from one quick step) should take place in the `bd4c-code
 
 * Docker
 * Boot2Docker, if you're on OSX
-* Ruby with rake, and the pry gem
-* Node with npm
+* Ruby 
 * Basic comfort pasting things into a terminal window and hitting enter.
 
 ### Running under boot2docker
@@ -57,6 +56,18 @@ export DOCKER_HOST=tcp://$DOCKER_IP:2375
 ```
 
 The `DOCKER_IP` variable isn't necessary for docker, but it will be useful for working at the commandline -- when we refer to `$DOCKER_IP` in the following we mean just that bare IP address of the docker<->host bridge.
+
+### Install the script dependencies
+
+We'll need a couple common dependencies for the scripts we'll use. Using a reasonably modern version of ruby (> 1.9.2, > 2.0 preferred):
+
+```
+gem install bundler
+bundler install
+rake ps
+```
+
+If your ruby environment is good, the last command will give similar output to running `docker ps -a`.
 
 ### Pull in the containers
 
@@ -214,6 +225,8 @@ The rake tasks are just scripts around the `docker` command, and print each comm
 
 
 ### Checklist
+
+#### Is the 
 
 #### Are the data volumes in place?
 
