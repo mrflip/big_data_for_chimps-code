@@ -27,9 +27,9 @@ RUN                                                               \
 # !!! Do we keep this, or leave it?
 RUN /usr/sbin/enable_insecure_key && /etc/my_init.d/00_regen_ssh_host_keys.sh
 
-# Use the deb-proxy cache started in helper
-#COPY /img/baseimage/setup-deb_proxy.sh     /build/
-#RUN          /build/setup-deb_proxy.sh
+# # Use the deb-proxy cache started in helper
+# COPY /img/baseimage/setup-deb_proxy.sh     /build/
+# RUN          /build/setup-deb_proxy.sh
 
 # Add the apt repos we will use
 COPY /img/baseimage/setup-add_apt_repos.sh /build/

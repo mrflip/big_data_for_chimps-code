@@ -13,7 +13,7 @@ HADOOP_IMAGES = [
 ].map{|slug| "#{DOCKER_USER}/#{slug}" }
 
 DATA_IMAGES = [
-  'data_gold', 'data_outd', 'data_nn', 'data_hdfs0',
+  'data_gold', 'data_outd', 'data_hue', 'data_nn', 'data_hdfs0',
   'home_chimpy', 'volume_boxer',
 ].map{|slug| "#{DOCKER_USER}/#{slug}" }
 
@@ -25,15 +25,17 @@ HADOOP_CONTAINERS = [
 ]
 
 DATA_CONTAINERS = {
-  data_gold:   { image: 'bd4c/data_gold',    volumes: ['/data/gold'],         },
-  data_outd:   { image: 'bd4c/data_outd',    volumes: ['/data/outd'],         },
-  data_hdfs0:  { image: 'bd4c/data_hdfs0',   volumes: ['/bulk/hadoop/hdfs'],  },
-  data_nn:     { image: 'bd4c/data_nn',      volumes: ['/bulk/hadoop/name'],  },
-  home_chimpy: { image: 'bd4c/home_chimpy',  volumes: ['/home/chimpy'],  },
+  data_gold:   { image: 'bd4c/data_gold',    volumes: ['/data/gold'],        },
+  data_outd:   { image: 'bd4c/data_outd',    volumes: ['/data/outd'],        },
+  data_hue:    { image: 'bd4c/data_hue',     volumes: ['/bulk/hadoop/hue'],  },
+  data_hdfs0:  { image: 'bd4c/data_hdfs0',   volumes: ['/bulk/hadoop/hdfs'], },
+  data_nn:     { image: 'bd4c/data_nn',      volumes: ['/bulk/hadoop/name'], },
+  home_chimpy: { image: 'bd4c/home_chimpy',  volumes: ['/home/chimpy'],      },
 }
 
 CONTAINER = ENV['ctr'] || ENV['container']
-IMAGE     = ENV['img'] || ENV['img']
+IMAGE     = ENV['img'] || ENV['image']
+TAG       = ENV['tag']
 
 namespace :data do
   task(:run) do
@@ -112,15 +114,38 @@ namespace :docker do
     end
   end
 
+  def tagged_image(name)
+    (TAG.present? ? "#{name}:#{TAG}" : name)
+  end
+
   task :pull do
     ALL_IMAGES.each do |img_name|
+      img_name = tagged_image(img_name)
       banner("Pull #{img_name} -- this can take a stupidly long time")
       sh("docker pull #{img_name}")
     end
   end
 
+  task :tag do
+    tag = DockerRunner.expect_one(:tag, TAG)
+    (HADOOP_IMAGES + DATA_IMAGES).each do |img_name|
+      sh "docker tag #{img_name} #{img_name}:#{tag}"
+    end
+  end
+
+  task :kill_images_zomg do
+    images = DockerRunner.arg_or_all(IMAGE, HADOOP_IMAGES)
+    images.each do |img_name|
+      img_name = tagged_image(img_name)
+      banner("Removing #{img_name} -- hope you didn't want it")
+      sleep 1
+      DockerRunner.execute("docker", "rmi", img_name, ignore_errors: true)
+    end
+  end
+
   task :push do
     (HADOOP_IMAGES + DATA_IMAGES).each do |img_name|
+      img_name = tagged_image(img_name)
       banner("Push #{img_name} -- this can take a stupidly long time, and you have to be part of the bd4c org for it to work")
       sh("docker push #{img_name}")
     end
@@ -280,16 +305,17 @@ end
 
 module DockerRunner
   extend self; # methods now callable with DockerRunner.foo as well
-  def expect_one(arg, opts={})
+  def expect_one(name, arg)
     if arg.blank? || (arg.to_s == 'all')
-      abort "Please supply a single container name with 'ctr=name' (not 'all')"
+      abort "Please supply a single #{name} name with '#{name}=val' (and not '#{name}=all')"
     end
     arg
   end
 
   def arg_or_all(container, all)
+    param = 'whatever'
     if container.blank?
-      abort "Please supply a container name with 'ctr=name', or 'ctr=all' for all relevant containers"
+      abort "Please supply a name with '#{param}=name', or '#{param}=all' for all relevant #{param}s"
     end
     container = all if container == 'all'
     Array.wrap(container)
@@ -307,7 +333,7 @@ module DockerRunner
   end
 
   def start(container, opts={})
-    expect_one(container)
+    expect_one(:ctr, container)
     params = ParamList.new.add_flag('-ia', opts[:interactive])
     execute(*["docker", "start", *params, container], opts)
   end

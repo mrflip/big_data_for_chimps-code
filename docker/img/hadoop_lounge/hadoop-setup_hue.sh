@@ -44,5 +44,3 @@ mkdir -p         $HADOOP_LOG_DIR/hue-daemon
 chown hue:hue    $HADOOP_LOG_DIR/hue-app
 EOF
 chmod a+x /etc/my_init.d/30_fix_hue_perms.sh
-
-cp -rp /home/chimpy /home/chimpy-dupe

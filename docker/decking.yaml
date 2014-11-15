@@ -1,7 +1,6 @@
 # Images decking should create. Use these labels for the 'decking build'
 # command, or use 'all' to run all of them.
 images:
-  "bd4c/deb_proxy":        "./img/deb_proxy"
   "bd4c/baseimage":        "./img/baseimage"
   "bd4c/hadoop_base":      "./img/hadoop_base"
   "bd4c/hadoop_nn":        "./img/hadoop_nn"
@@ -10,9 +9,9 @@ images:
   "bd4c/hadoop_worker":    "./img/hadoop_worker"
   "bd4c/hadoop_lounge":    "./img/hadoop_lounge"
   # "bd4c/hadoop_solo":      "./img/hadoop_solo"
-  #
-  # "bd4c/databox_archiver": "./img/datasets"
   "bd4c/volume_boxer":     "./img/volume_boxer"
+  #
+  # "bd4c/deb_proxy":        "./img/deb_proxy"
 
 # Containers to define. Options here correspond to common 'docker run' options.
 containers:

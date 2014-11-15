@@ -7,7 +7,6 @@ ENV  HUE_CONF_DIR        /etc/hue/conf.cluster
 ENV  HUE_HOME            /usr/lib/hue
 ENV  HUE_DATA_DIR        /bulk/hadoop/hue
 ENV  HADOOP_HIVE_HOSTNAME lounge
-# ENV  HADOOP_HIVE_HOSTNAME $HOSTNAME
 
 # Configure Hadoop client
 #
@@ -18,6 +17,8 @@ RUN             /build/hadoop-setup_client.sh
 # 
 COPY img/hadoop_lounge/conf/hue.ini.mustache $HUE_CONF_DIR/
 
+# Install and configure Hue.
+#
 COPY img/hadoop_lounge/hadoop-setup_hue.sh  /build/
 RUN             /build/hadoop-setup_hue.sh
 
@@ -27,6 +28,8 @@ RUN             /build/hadoop-setup_hue.sh
 # COPY img/hadoop_lounge/conf/README.md       /home/chimpy/
 # COPY img/hadoop_lounge/add_chimpy_user.sh   /build/
 # RUN             /build/add_chimpy_user.sh
+
+# Copy the hue config scripts and enable the servise
 #
 COPY img/hadoop_lounge/runit/hadoop_hue-runner.sh /etc/sv/hadoop_hue/run
 COPY img/hadoop_lounge/runit/hadoop_hue-logger.sh /etc/sv/hadoop_hue/log/run

@@ -215,6 +215,7 @@ Right you are. There's tons of examples in the book, of course, but let's make s
 On hadoop:
 
 ```
+cd book/code/
   # This file isn't on the HDFS right now, so put it there:
 hadoop fs -mkdir -p /data/gold/geo/ufo_sightings
 hadoop fs -put      /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2 /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2

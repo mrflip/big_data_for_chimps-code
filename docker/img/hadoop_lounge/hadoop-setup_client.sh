@@ -23,7 +23,3 @@ $safe_apt_install hive
 $safe_apt_install python-mrjob
 $safe_apt_install oozie-client  
 $safe_apt_install hive-hcatalog hive-webhcat hive-webhcat-server
-
-# Hadoop Hue -- pretty front-end to hadoop
-#
-$safe_apt_install hue
