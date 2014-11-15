@@ -17,7 +17,7 @@ SHOW_OUTPUT = ENV['SHOW_OUTPUT']
 
 if (ENV['DOCKER_HOST'].blank? && ENV['NO_DOCKER_HOST'].blank?) then warn "You don't seem to have a DOCKER_HOST environment variable set; if you see an error about socks that's why. Boot2docker users should run 'boot2docker up' and follow the instructions given. If your setup is correct, set the environment variable NO_DOCKER_HOST to anything to make this warning go away" ; end
 
-EXTERNAL_IMAGES  = [ 'blalor/docker-hosts', 'phusion/baseimage:0.9.15', 'busybox' ]
+EXTERNAL_IMAGES  = [ 'blalor/docker-hosts', 'phusion/baseimage:0.9.15', 'radial/busyboxplus', 'bd4c/volume_boxer' ]
 
 task :launch_all => [ 'helpers:run', 'sleep', 'data:create', 'sleep', 'hadoop:run' ]
 
@@ -113,11 +113,11 @@ namespace :images do
   end
 
   task :push do
-    tag = Rucker.expect_one(:tag, TAG)
+    tag = Rucker.expect_one(:tag, TAG || 'latest')
     puts "Pushing imags prefixed with $DOCKER_ORG=#{DOCKER_ORG} -- this can take a stupidly long time, and you have to be part of the #{DOCKER_ORG} org for it to work."
     LAYOUT.image_names.each do |img_name|
       next unless img_name =~ %r{#{DOCKER_ORG}/}
-      img_name = tagged_image(img_name)
+      img_name = "#{img_name}:#{tag}"
       Rucker.banner("Push #{img_name} -- this can take a stupidly long time")
       sh("docker push #{img_name}")
     end
@@ -166,14 +166,14 @@ namespace :docker do
 
   task :images do
     lines = `docker images --no-trunc`.split(/[\r\n]+/).drop(1)
-    images = lines.each_with_index.map{|line, idx| DockerImage.from_listing(line, idx) }
+    images = lines.each_with_index.map{|line, idx| Rucker::Image.from_listing(line, idx) }
     images.sort_by(&:name).each{|image| puts image.to_s }
   end
 
   task :history do
     Rucker.expect_one('image', IMAGE)
     lines = `docker history --no-trunc #{IMAGE}`.split(/[\r\n]+/).drop(1)
-    images = lines.each_with_index.map{|line, idx| DockerImage.from_history(line, idx) }
+    images = lines.each_with_index.map{|line, idx| Rucker::Image.from_history(line, idx) }
     images.sort_by(&:name).each{|image| puts image.to_s }
   end
 

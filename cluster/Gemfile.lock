@@ -22,6 +22,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  gorillib
-  pry
-  rake
+  gorillib (~> 0.6)
+  pry (~> 0.10)
+  rake (~> 10.3)

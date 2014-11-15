@@ -137,10 +137,11 @@ module Rucker
   end
 
   class Image < Dockerer
+    include Gorillib::Model::PositionalFields
     field :id,       :string
     field :name,     :string
     field :tag,      :string
-    field :sz_num,   :integer
+    field :sz_num,   :float
     field :sz_units, :string
     field :ago,      :string
     field :cmd,      :string

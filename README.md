@@ -20,7 +20,7 @@ Everything below (apart from one quick step) should take place in the `bd4c-code
 
 * Docker
 * Boot2Docker, if you're on OSX
-* Ruby 
+* Ruby
 * Basic comfort pasting things into a terminal window and hitting enter.
 
 ### Running under boot2docker
@@ -63,7 +63,7 @@ We'll need a couple common dependencies for the scripts we'll use. Using a reaso
 
 ```
 gem install bundler
-bundler install
+bundle install
 rake ps
 ```
 
@@ -181,7 +181,7 @@ All of the nodes in the cluster are available for ssh. Using the normal SSH port
 
 #### The dangerous thing we did that you need to know about
 
-We've done something here that usually violates taste, reason and safety: the private key that controls access to the container is available to anyone with a browse. To bring that point home, the key is named `insecure_key.pem`. Our justification is that these machines are (a) designed to work within the private confines of a VM, without direct inbound access from the internet, and (b) are low-stakes playgrounds with only publicly redistributable code and data sets. If either of those assumptions becomes untrue -- you are pushing to the docker cloud, or using these machines to work with data of your own, or whatever -- then we urge you to construct new private/public keypairs specific _only_ to each machine, replacing the `/root/.ssh/authorized_keys` and `/home/chimpy/.ssh/authorized_keys` files. (It's those latter files that grant access; the existing key must be removed and a new one added to retain access.) It's essential that any private keys you generate be unique to these machines: it's too easy to ship a container to the wrong place or with the wrong visibility at the current maturity of these tools. So don't push in the same key you use for accessing work servers or github or docker or the control network for your secret offshore commando HQ. 
+We've done something here that usually violates taste, reason and safety: the private key that controls access to the container is available to anyone with a browse. To bring that point home, the key is named `insecure_key.pem`. Our justification is that these machines are (a) designed to work within the private confines of a VM, without direct inbound access from the internet, and (b) are low-stakes playgrounds with only publicly redistributable code and data sets. If either of those assumptions becomes untrue -- you are pushing to the docker cloud, or using these machines to work with data of your own, or whatever -- then we urge you to construct new private/public keypairs specific _only_ to each machine, replacing the `/root/.ssh/authorized_keys` and `/home/chimpy/.ssh/authorized_keys` files. (It's those latter files that grant access; the existing key must be removed and a new one added to retain access.) It's essential that any private keys you generate be unique to these machines: it's too easy to ship a container to the wrong place or with the wrong visibility at the current maturity of these tools. So don't push in the same key you use for accessing work servers or github or docker or the control network for your secret offshore commando HQ.
 
 ## I WANT TO SEE DATA GO, YOU PROMISED
 
@@ -201,7 +201,7 @@ pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
   # See the output:
 hadoop fs -cat /data/outd/ufos/sightings_hist/\* > /tmp/sightings_hist.tsv
   # Whadday know, they're the same!
-colordiff -uw /data/outd/ufos/sightings_hist-reference.tsv /tmp/sightings_hist.tsv | echo 'No diffference'
+colordiff -uw /data/outd/ufos/sightings_hist-reference.tsv /tmp/sightings_hist.tsv && echo 'No diffference'
 ```
 
 Locally!
@@ -211,12 +211,12 @@ Locally!
   # also note that at this moment you are running someting in ~book/code (book repo) and not ~/code
 cd book/code
   # Need to remove the output directory -- check that there's nothing in it, then remove it
-ls /data/outd/ufos/sightings_hist 
+ls /data/outd/ufos/sightings_hist
 rm -rf /data/outd/ufos/sightings_hist
   # Run, pig, run
-pig -x local 04-intro_to_pig/a-ufo_visits_by_month.pig 
+pig -x local 04-intro_to_pig/a-ufo_visits_by_month.pig
    # Look ma, just what we predicted!
-colordiff -uw /data/outd/ufos/sightings_hist{-reference.tsv,/part*} | echo 'No diffference'
+colordiff -uw /data/outd/ufos/sightings_hist{-reference.tsv,/part*} && echo 'No diffference'
 ```
 
 ## Troubleshooting
@@ -226,7 +226,77 @@ The rake tasks are just scripts around the `docker` command, and print each comm
 
 ### Checklist
 
-#### Is the 
+#### Is your commandline environment complete and correct?
+
+Check that you know where you are:
+
+* `git remote show origin` shows something like `https://github.com/infochimps-labs/big_data_for_chimps-code.git` (actually right now it's at `https://github.com/mrflip/big_data_for_chimps-code.git`)
+* `git fetch --all origin` succeeds.
+* `git diff origin/master` shows no unexplained differences
+* `pwd` shows a directory that ends in `cluster`, a subdirectory of the repo you cloned.
+
+check that docker is happy:
+
+* Running `boot2docker up` tells you that all your environment variables are happy. (It's safe to run this more than once)
+* Running `echo $DOCKER_HOST` from your terminal returns the address of your docker host
+* Running `docker ps` shows a first line reading `CONTAINER ID   IMAGE     COMMAND ...`
+
+Check that ruby is happy:
+
+* `ruby --version` shows `1.9.2` or more recent (preferably `2.something`). If not, consult the internet for instructions on installing ruby.
+
+Check that your gems are installed correctly:
+
+* `bundle --version` shows `1.7.6` or better. If not, run `gem install bundler`.
+* `git status` shows no differences in Gemfile or Gemfile.lock from the mainline repo. If not, check out an unchanged version and run `bundle install` (and not, for example, `bundle update`)
+* `bundle install` shows a bunch of lines saying 'Using ...' (not 'Installing ...') and finishes with 'Your bundle is complete!'.
+* `rake --version` completes and shows `10.3` or better.
+
+Check that rake and the rakefile are basically sane:
+
+* `rake -T` returns content like
+
+   ```
+   rake data:create[container]       # Create the given container, or all in the data cluster with data:create[all]
+   rake data:delete_data[container]  # Removes the given containers, or all in the data cluster with data:delete_data[all]
+   rake df                           # Uses boot2docker to find the disk free space of the docker host
+   rake hadoop:rm[container]         # Remove the given container, or all in the hadoop cluster with hadoop:rm[all]
+   ```
+
+* `rake ps` shows the same basic info as `docker ps`.
+
+#### Do you have the right images?
+
+* Running `rake images:pull` marches through the list fairly quickly, reporting in a bored tone that it already has everything.
+
+* `docker images` shows something like the following:
+
+  ```
+    6     bd4c/baseimage          latest          1130650140        1.053 GB      024867a51a963   26 hours ago            -
+    9     bd4c/data_gold          latest           515584819        491.7 MB      419705640c68d   28 hours ago            -
+   19     bd4c/data_hdfs0         latest           322227404        307.3 MB      503690dc75293   39 hours ago            -
+    7     bd4c/data_hue           latest            92536832        88.25 MB      054799fcb4bea   27 hours ago            -
+   15     bd4c/data_nn            latest            96720650        92.24 MB      6431a7bc41c16   33 hours ago            -
+   12     bd4c/data_outd          latest            92327116        88.05 MB      798c7aea9b31b   28 hours ago            -
+    5     bd4c/hadoop_base        latest          1314259992        1.224 GB      4f6e4def7638f   26 hours ago            -
+    0     bd4c/hadoop_lounge      latest          1900523028         1.77 GB      e4176c0a41572   26 hours ago            -
+    4     bd4c/hadoop_nn          latest          1318554959        1.228 GB      2701a8c4dbda1   26 hours ago            -
+    3     bd4c/hadoop_rm          latest          1317481218        1.227 GB      509a118c6b911   26 hours ago            -
+    2     bd4c/hadoop_snn         latest          1317481218        1.227 GB      f8b74aecb6927   26 hours ago            -
+    1     bd4c/hadoop_worker      latest          1319628701        1.229 GB      17465e5f6811e   26 hours ago            -
+   13     bd4c/home_chimpy        latest           225234124        214.8 MB      e2b36f311e76a   28 hours ago            -
+   20     bd4c/volume_boxer       latest            92316631        88.04 MB      b62e15f22f9d8   42 hours ago            -
+   34     blalor/docker-hosts     latest           345400934        329.4 MB      98e7ca605530c   3 months ago            -
+   27     phusion/baseimage       0.9.15           303457894        289.4 MB      cf39b476aeec4   6 weeks ago             -
+   33     radial/busyboxplus      git               13484687        12.86 MB      30326056bb14d   8 weeks ago             -
+  ```
+
+#### Is the helpers cluster running?
+
+* Running `rake ps` shows a `host_filer` container, with status of 'Up (some amount of time)
+* On the docker host, `cat /var/lib/docker/hosts` has entries for 'host-filer' and all other containers you expect to be running.
+
+If not,
 
 #### Are the data volumes in place?
 

@@ -46,6 +46,7 @@ end
 
 require 'gorillib/model/field'
 require 'gorillib/model/defaults'
+require 'gorillib/model/positional_fields'
 
 require_relative 'rucker/keyed_collection'
 require_relative 'rucker/models'
