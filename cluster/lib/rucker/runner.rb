@@ -50,7 +50,7 @@ module Rucker
     # Remove the named containers
     # @param names [Array] container names to remove
     def rm(names, opts={})
-      execute("docker", "rm", *Array.wrap(names), opts)
+      execute("docker", "rm", '-v', *Array.wrap(names), opts)
     end
 
     def diff(name, opts={})
