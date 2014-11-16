@@ -21,9 +21,31 @@ EXTERNAL_IMAGES  = [ 'blalor/docker-hosts', 'phusion/baseimage:0.9.15', 'radial/
 
 task :launch_all => [ 'helpers:run', 'sleep', 'data:create', 'sleep', 'hadoop:run' ]
 
-task_args :sleep, :duration do |duration|
-  sleep(duration, 1)
+desc "Show the status of all running and stopped containers"
+task :ps do
+  sh "docker ps -a"
 end
+
+desc %Q{Display a compact summary of the cluster.
+  Specify additional fields -- [volumes, all_volumes, host_ports, all_ports, links, volumes_from, full_image_id, image_id] --
+  by giving either a ':' separated list of fields, or by supplying appropriate env. vars.}
+task_args :info, :container, :fields do |name, fields_str|
+  ctrs = LAYOUT.docker_info(name||'all')
+  flds = fields_str.to_s.split(/:\s*/).map(&:to_sym)
+
+  flds += [:volumes, :host_ports] if flds.blank?
+  flds += [:full, :volumes, :all_volumes, :host_ports, :all_ports, :links, :volumes_from, :full_image_id, :image_id].map do |fld|
+    fld if ENV[fld.to_s] || ENV[fld.to_s.upcase] || flds.include?(:full)
+  end.compact
+  flds.uniq!
+  flds -= [:host_ports] if flds.include?(:all_ports)
+  #
+  puts Rucker::Container.dump_header(*flds)
+  ctrs.each do |ctr|
+    puts ctr.dump(*flds)
+  end
+end
+
 
 #
 # Tasks on each cluster
@@ -65,34 +87,108 @@ namespace :data do
   container_task(:create) do |names, opts|
     opts  = opts.reverse_merge(ignore_errors: false)
     LAYOUT.cluster(:data).run(names || 'all', opts)
-  end.enhance{ Rake::Task[:ps].invoke }
+  end.enhance{ Rake::Task[:info].invoke }
 
   desc "Removes the given containers, or all in the data cluster with data:delete_data[all]"
   container_task(:delete_data) do |names, opts|
     names = Rucker.expect_some('container', names)
     opts  = opts.reverse_merge(ignore_errors: true)
     LAYOUT.cluster(:data).rm(names, opts)
-  end.enhance{ Rake::Task[:ps].invoke }
+  end.enhance{ Rake::Task[:info].invoke }
 
+  desc "Open a shell on a machine that mounts all volumes in the data cluster"
   task :inspector do
     inspector = Rucker::Container.new(:data_inspector, 'bd4c/hadoop_base',
-      volume_from: LAYOUT.cluster(:data).container_names,
+      volumes_from: LAYOUT.cluster(:data).container_names,
       entrypoint: '/bin/bash')
     inspector.run(interactive: true)
   end
 
-  container_task :archive do |name|
+  # Use this to manually create a new volume box
+  task_args :sheller, :container do |name|
+    name = Rucker.expect_one('container', name || ENV['CONTAINER'])
+    inspector = Rucker::Container.new("#{name}_sheller", "bd4c/volume_boxer",
+      volumes_from: [name], entry_args: ['shell'])
+    inspector.run(interactive: true)
+    puts "\nRemember to delete the stopped container (`docker rm #{name}_sheller`) when you're done with it"
+  end
+
+  desc "Snapshot incremental changes to a data image; supply 'show_output=true' to see detailed progress."
+  task_args :snapshot, :container do |names|
+    tag   = TAG || 'snapshot'
+    names = names || ENV['CONTAINER']
     containers = LAYOUT.cluster(:data).containers_slice(names || 'all')
+    show_output = ENV['show_output'].present? || ENV['SHOW_OUTPUT'].present?
     containers.each do |ctr|
-      Rucker.banner()
-      ctr.start(opts, interactive: true)
-      Rucker.banner
+      Rucker.banner("Existing images before incremental for #{ctr.image_name}")
+      Rucker::Image.dump_images(ctr.image_name)
+      Rucker.banner("Capturing data from #{ctr.name}")
+      ctr.start(interactive: show_output)
+      if show_output
+        Rucker.banner("Here's what's changed on #{ctr.name}")
+        ctr.diff
+      end
+      dest_image_name = "#{ctr.image_name}:#{tag}"
+      Rucker.banner("Committing changes from #{ctr.name} onto #{dest_image_name}")
+      ctr.commit(dest_image_name)
+      if show_output
+        Rucker.banner("History:")
+        Rucker::Image.dump_history(dest_image_name)
+      end
+      puts "Finished with #{ctr.name} => #{dest_image_name}"
     end
   end
+
+  desc "Capture data to a new boxer-volume image; supply 'show_output=true' to see detailed progress"
+  task_args :archive, :container do |names|
+    tag   = TAG || 'archived'
+    names = names || ENV['CONTAINER']
+    containers = LAYOUT.cluster(:data).containers_slice(names || 'all')
+    show_output = ENV['show_output'].present? || ENV['SHOW_OUTPUT'].present?
+    #
+    containers.each do |ctr|
+      Rucker.banner("Existing images before incremental for #{ctr.image_name}")
+      Rucker::Image.dump_images(ctr.image_name)
+      #
+      Rucker.banner("Capturing data from #{ctr.name} using #{ctr.name}_boxer")
+      boxer = Rucker::Container.receive(ctr.attributes.merge(
+          image_name: 'bd4c/volume_boxer', name: "#{ctr.name}_boxer",
+          hostname: nil, links: [], ports: [], volumes_from: [ctr.name]))
+      boxer.rm(ignore_errors: true)
+      boxer.run(attaches: (show_output ? %w[STDOUT STDERR] : []))
+      #
+      if show_output
+        Rucker.banner("Here's what's changed on #{boxer.name}")
+        boxer.diff
+      end
+      #
+      dest_image_name = "#{ctr.image_name}:#{tag}"
+      Rucker.banner("Committing changes from #{boxer.name} onto #{dest_image_name}")
+      boxer.commit(dest_image_name)
+      #
+      Rucker.banner("Removing #{boxer.name}")
+      boxer.rm(ignore_errors: true)
+      #
+      if show_output
+        Rucker.banner("History:")
+        Rucker::Image.dump_history(dest_image_name)
+      end
+      #
+
+      #
+      puts "Finished with #{ctr.name} => #{dest_image_name}"
+    end
+  end
+
+
 end
 
 
 namespace :images do
+  def tagged_image(name)
+    (TAG.present? ? "#{name}:#{TAG}" : name)
+  end
+
   desc "Pull all images from the docker hub. Takes a while. Supply a TAG=name env var to get only corresponding bd4c images"
   task :pull do
     our_images = LAYOUT.image_names.map{|img_name| tagged_image(img_name) }
@@ -122,21 +218,31 @@ namespace :images do
       sh("docker push #{img_name}")
     end
   end
-end
 
+  desc "List images in a compact tab-separated form"
+  task_args :ls, :img_names do |img_names|
+    Rucker::Image.dump_images(img_names.to_s)
+  end
+
+  desc "History of an image in a compact tab-separated for"
+  task_args :history, :name do |img_name|
+    img_name ||= Rucker.expect_one('image', IMAGE)
+    Rucker::Image.dump_history(img_name)
+  end
+end
+task :images => 'images:list'
 
 #
 # Utility tasks
 #
 
-desc "Show the status of all running and stopped containers"
-task :ps do
-  sh "docker ps -a"
-end
-
 desc "Uses boot2docker to find the disk free space of the docker host. Do a `rake docker:rmi_blank` if you don't like what you see."
 task :df do
   sh "boot2docker ssh df -m /mnt/sda1"
+end
+
+task_args :sleep, :duration do |duration|
+  sleep(duration, 1)
 end
 
 namespace :docker do
@@ -147,8 +253,11 @@ namespace :docker do
   #   end
   # end
 
-  def tagged_image(name)
-    (TAG.present? ? "#{name}:#{TAG}" : name)
+  desc "Show detailed information on a container"
+  task_args :inspect, :container do |name|
+    Rucker.expect_one('container', name)
+    container = LAYOUT.container(name)
+    puts container.docker_inspect
   end
 
   task :rm_stopped do
@@ -163,20 +272,6 @@ namespace :docker do
   task :rmi_blank do
     sh "docker rmi $(docker images | grep '^<none>' | awk '{print $3}') ; true"
   end
-
-  task :images do
-    lines = `docker images --no-trunc`.split(/[\r\n]+/).drop(1)
-    images = lines.each_with_index.map{|line, idx| Rucker::Image.from_listing(line, idx) }
-    images.sort_by(&:name).each{|image| puts image.to_s }
-  end
-
-  task :history do
-    Rucker.expect_one('image', IMAGE)
-    lines = `docker history --no-trunc #{IMAGE}`.split(/[\r\n]+/).drop(1)
-    images = lines.each_with_index.map{|line, idx| Rucker::Image.from_history(line, idx) }
-    images.sort_by(&:name).each{|image| puts image.to_s }
-  end
-
 
   def forward_ports(ports)
     ports.each do |port, name|

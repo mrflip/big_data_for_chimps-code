@@ -2,12 +2,14 @@ require 'pry'
 require 'yaml'
 require 'rake'
 require 'rake/file_utils.rb'
+require 'multi_json'
 
 require 'gorillib'
 require 'gorillib/pathname'
 require 'gorillib/hash/keys'
 require 'gorillib/array/wrap'
 require 'gorillib/enumerable/hashify'
+require 'gorillib/system/runner'
 
 require 'gorillib/object/blank'
 require 'gorillib/object/try'
@@ -68,16 +70,16 @@ module Rucker
 
   def expect_one(name, arg)
     if arg.blank?
-      abort "Please supply a single #{name} name by adding '#{name}=val' to the command line"
+      abort "Please supply a single #{name} name by adding '#{name.upcase}=val' to the command line"
     elsif (arg.to_s == 'all')
-      abort "Please supply a single #{name} name, not '#{name}=all'"
+      abort "Please supply a single #{name} name, not '#{name.upcase}=all'"
     end
     arg
   end
 
   def expect_some(name, arg)
     if arg.blank?
-      abort "Please supply a single #{name} name with '#{name}=val', or '#{name}=all' for all relevant #{name}s"
+      abort "Please supply a single #{name} name with '#{name.upcase}=val', or '#{name.upcase}=all' for all relevant #{name}s"
     end
     arg
   end

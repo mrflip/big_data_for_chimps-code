@@ -1,6 +1,7 @@
 module Rucker
   class Dockerer
     include Gorillib::Model
+    include Gorillib::Model::PositionalFields
   end
 
   class Container < Dockerer
@@ -17,7 +18,7 @@ module Rucker
     field :entry_args,   :array, default: ->{ [] }
 
     def run(opts={})
-      Rucker::ContainerRunner.run(self.attributes.merge(opts))
+      Rucker::ContainerRunner.run(self, opts)
     end
 
     def start(opts={})
@@ -32,6 +33,168 @@ module Rucker
       Rucker::ContainerRunner.stop(name, opts)
     end
 
+    def diff(opts={})
+      Rucker::ContainerRunner.diff(name, opts)
+    end
+
+    def commit(dest_image_name, opts={})
+      Rucker::ContainerRunner.commit(name, dest_image_name, opts)
+    end
+
+    def docker_inspect
+      Rucker::ContainerRunner.docker_inspect(self.name)
+    end
+
+    #
+    # Runtime Information
+    #
+
+    def docker_info
+      return @docker_info if instance_variable_defined?(:@docker_info)
+      @docker_info ||= Rucker::ContainerRunner.docker_info(self.name).first
+    end
+    def docker_info=(info) @docker_info = info ; end
+
+    def ip_address
+      return unless docker_info.present?
+      docker_info[:NetworkSettings][:IPAddress]
+    end
+
+    def full_id()
+      return unless docker_info.present?
+      docker_info[:Id]
+    end
+    def id() full_id[0..12] ; end
+
+    def full_image_id()
+      return '' unless docker_info.present?
+      docker_info[:Image]
+    end
+    def image_id()  full_image_id[0..12] ; end
+
+    def real_image_name
+      return docker_info[:Config][:Image] if docker_info.present?
+      read_attribute(:image_name)
+    end
+
+    def real_links
+      return [] unless docker_info.present?
+      lls = docker_info[:HostConfig][:Links] or return Array.new
+      lls.map{|ll| ll.gsub(%r{^.*/(.*?):.*}, '\1') }
+    end
+
+    # Volumes from as actually reported
+    def real_volumes_from
+      return [] unless docker_info.present?
+      docker_info[:HostConfig][:VolumesFrom] || Array.new
+    end
+
+    # Volumes as actually reported by docker
+    def real_volumes
+      return [] unless docker_info.present?
+      docker_info[:Config][:Volumes].keys || Array.new rescue Array.new
+    end
+
+    # All volumes, shared or not
+    def all_volumes
+      return [] unless docker_info.present?
+      docker_info[:Volumes].keys || Array.new rescue Array.new
+    end
+
+    def ports_info
+      return @ports_info if instance_variable_defined?(:@ports_info)
+      exposed = docker_info[:Config][:ExposedPorts]     || Hash.new rescue Hash.new
+      on_host = docker_info[:HostConfig][:PortBindings] || Hash.new rescue Hash.new
+      network = docker_info[:NetworkSettings][:Ports]   || Hash.new rescue Hash.new
+      names = [exposed.keys, on_host.keys, network.keys].flatten.uniq.sort
+      @ports_info = names.hashify do |name|
+        { exposed: (exposed[name]||[]), on_host: (on_host[name]||[]), network: (network[name]||[]) }
+      end
+    end
+
+    def all_ports
+      ps = ports_info.map do |pnt, info|
+        p_name = pnt.to_s.gsub(%r{/.*}, '').to_i
+        p_host = info[:on_host].first[:HostPort] rescue nil
+        p_net  = info[:network].first[:HostPort] rescue nil
+        ext   = "#{p_host}:" if p_host.present?
+        ext ||= "#{p_net}~"  if p_net.present?
+        ext ||= ''
+        [p_name, ext]
+      end.sort_by(&:first)
+      ps.map{|pn, ext| [ext, pn].join }
+    end
+
+    def host_ports
+      ps = ports_info.map do |pnt, info|
+        info[:on_host].first[:HostPort] rescue nil
+      end.compact_blank.map(&:to_i).sort
+    end
+
+    def state_info
+      return @state_info if instance_variable_defined?(:@state_info)
+      if docker_info.blank?
+        return @state_info = { state: :absent }
+      end
+      state_hsh = docker_info[:State]
+      @state_info =
+        case
+        when state_hsh[:Running]    then { state: :running,    time: state_hsh[:StartedAt],  started_at: state_hsh[:StartedAt], finished_at: state_hsh[:FinishedAt], }
+        when state_hsh[:Restarting] then { state: :restart, time: state_hsh[:StartedAt],  started_at: state_hsh[:StartedAt], finished_at: state_hsh[:FinishedAt], }
+        when state_hsh[:Paused]     then { state: :paused,     time: state_hsh[:FinishedAt], started_at: state_hsh[:StartedAt], finished_at: state_hsh[:FinishedAt], }
+        else                             { state: :stopped,    time: state_hsh[:FinishedAt], started_at: state_hsh[:StartedAt], finished_at: state_hsh[:FinishedAt], }
+        end
+    end
+
+    def state()      state_info[:state] ; end
+    def state_time() state_info[:time]  ; end
+
+    def essentials
+      { ip_address: ip_address,
+      }
+    end
+
+    def dump_arr(arr, len, full=false)
+      str = arr.join(',')
+      if (not full) && (str.length > len)
+        str = str[0..(len-3)]+'...'
+      end
+      str
+    end
+
+    def dump(*flds)
+      full = flds.include?(:full)
+      str = "%-23s\t%-7s\t%-15s\t%-15s\t%-23s" % [
+        name, state, ip_address, hostname, image_name ]
+      str << "\t%-12s" % image_id                          if flds.include?(:image_id)
+      str << "\t%-64s" % full_image_id                     if flds.include?(:full_image_id)
+      str << "\t%-23s" % dump_arr(real_volumes, 23, full)      if flds.include?(:volumes)
+      str << "\t%-23s" % dump_arr(all_volumes, 23, true)       if flds.include?(:all_volumes)
+      str << "\t%-23s" % dump_arr(real_volumes_from, 23, full) if flds.include?(:volumes_from)
+      str << "\t%-23s" % dump_arr(real_links, 23, full)        if flds.include?(:links)
+      str << "\t%-31s" % dump_arr(host_ports, 31, full)        if flds.include?(:host_ports)
+      str << "\t%-31s" % dump_arr(all_ports, 31, true)         if flds.include?(:all_ports)
+      str
+    end
+
+    def self.dump_header(*flds)
+      str = "%-23s\t%-7s\t%-15s\t%-15s\t%-23s" % %w[ name state ip_address hostname image_name ]
+      str << "\t%-12s" % 'image_id'      if flds.include?(:image_id)
+      str << "\t%-64s" % 'full_image_id' if flds.include?(:full_image_id)
+      str << "\t%-23s" % 'volumes'       if flds.include?(:volumes)
+      str << "\t%-23s" % 'all_volumes'   if flds.include?(:all_volumes)
+      str << "\t%-23s" % 'volumes_from'  if flds.include?(:volumes_from)
+      str << "\t%-23s" % 'links'         if flds.include?(:links)
+      str << "\t%-31s" % 'all_ports'     if flds.include?(:all_ports)
+      str << "\t%-31s" % 'ports'         if flds.include?(:host_ports)
+      str
+    end
+
+
+    #
+    # Machinery
+    #
+
     # used by KeyedCollection to know how to index these
     def collection_key()        name ; end
     # used by KeyedCollection to know how to index these
@@ -45,7 +208,7 @@ module Rucker
   class Cluster < Dockerer
     field :name, :symbol
     field :containers, Rucker::KeyedCollection, default: ->{ Rucker::KeyedCollection.new(of: Rucker::Container, belongs_to: self) }
-    def container(name)   containers[:name] ; end
+    def container(name)   containers[name.to_sym] ; end
     def container_names() containers.keys ; end
 
     #
@@ -78,15 +241,15 @@ module Rucker
     # Machinery
     #
 
-    def containers_slice(ctr_names)
-      return containers if ctr_names.to_s == 'all'
-      containers.slice(*check_container_keys(ctr_names))
+    def containers_slice(ctr_names, opts={})
+      return containers.to_a if ctr_names.to_s == 'all'
+      containers.slice(*check_container_keys(ctr_names, opts))
     end
 
-    def check_container_keys(ctr_names)
+    def check_container_keys(ctr_names, opts={})
       return containers.keys if ctr_names.to_s == 'all'
       ctr_names = Array.wrap(ctr_names).map(&:to_sym)
-      unless containers.all_present?(ctr_names) then warn("Keys #{containers.missing_keys(ctr_names)} aren't present in this cluster, skipping") ; end
+      unless opts[:ignore_extra] || containers.all_present?(ctr_names) then warn("Keys #{containers.extra_keys(ctr_names)} aren't present in this cluster, skipping") ; end
       (ctr_names & containers.keys) # intersection
     end
 
@@ -111,33 +274,7 @@ module Rucker
     # end
   end
 
-  class Layout
-    include Gorillib::Model
-    field :clusters,   :array, of: Rucker::Cluster
-    def cluster(name) clusters.find{|cl| cl.name == name } ; end
-
-    def self.load
-      layout = YAML.load_file Pathname.of(:cluster_layout)
-      clusters = layout['clusters'].map do |cl_name, ctr_infos|
-        Cluster.receive(name: cl_name, containers: ctr_infos)
-      end
-      self.new(clusters: clusters)
-    end
-
-    def image_names(cl_names='all')
-      clusters_slice(cl_names).map(&:image_names).flatten.uniq
-    end
-
-    def clusters_slice(cl_names)
-      return clusters if cl_names.to_s == 'all'
-      Array.wrap(cl_names).map do |cl_name|
-        cluster(cl_name) or abort("Can't find cluster #{cl_name} in #{self.inspect}")
-      end
-    end
-  end
-
   class Image < Dockerer
-    include Gorillib::Model::PositionalFields
     field :id,       :string
     field :name,     :string
     field :tag,      :string
@@ -172,8 +309,76 @@ module Rucker
 
     PRINTF_FORMAT = %w[%3d %-23s %-15s %10d %7s\ %2s %12s %-23s %s].join("\t")
 
-    def to_s
+    def to_table
       PRINTF_FORMAT % [idx, name, tag, size, sz_num, sz_units, short_id, ago, short_cmd]
+    end
+
+
+    def self.dump_images(img_names)
+      output, stderr, status  = Rucker::Runner.get_output('docker', 'images', '--no-trunc', img_names, ignore_errors: true)
+      lines = output.split(/[\r\n]+/).drop(1)
+      images = lines.each_with_index.map{|line, idx| Rucker::Image.from_listing(line, idx) }
+      images.sort_by(&:name).each{|image| puts image.to_table }
+    end
+
+    def self.dump_history(img_name)
+      output, stderr, status  = Rucker::Runner.get_output('docker', 'history', '--no-trunc', img_name)
+      lines = output.split(/[\r\n]+/).drop(1)
+      images = lines.reverse.each_with_index.map{|line, idx| Rucker::Image.from_history(line, idx) }
+      images.sort_by(&:name).each{|image| puts image.to_table }
+    end
+
+  end
+
+  class Layout
+    include Gorillib::Model
+    field :clusters,   :array, of: Rucker::Cluster
+    def cluster(name) clusters.find{|cl| cl.name == name } ; end
+
+    def self.load
+      layout = YAML.load_file Pathname.of(:cluster_layout)
+      clusters = layout['clusters'].map do |cl_name, ctr_infos|
+        Cluster.receive(name: cl_name, containers: ctr_infos)
+      end
+      self.new(clusters: clusters)
+    end
+
+    def container(name)
+      clusters.map{|cl| cl.container(name) }.compact.first
+    end
+
+    # All containers in all clusters
+    def containers_slice(name)
+      clusters.map{|cl| cl.containers_slice(name, ignore_extra: true).to_a }.flatten.compact
+    end
+
+    # All containers in all clusters
+    def docker_info(names)
+      ctrs = containers_slice(names)
+      if ctrs.blank? then warn("No containers found for #{names}") ; return [] end
+      # get a hash from name => info -- docker skips containers not running or stopped
+      infos = Rucker::ContainerRunner.docker_info( ctrs.map(&:name) )
+      infos_map = infos.inject({}) do |hsh, info|
+        name = info[:Name].gsub(%r{.*/}, '').to_sym
+        hsh[name] = info
+        hsh
+      end
+      # now walk back over the asked-for containers, decorating each with its info
+      ctrs.each do |ctr|
+        ctr.docker_info = infos_map[ctr.name]
+      end
+      ctrs
+    end
+
+    def image_names(cl_names='all')
+      clusters_slice(cl_names).map(&:image_names).flatten.uniq
+    end
+
+    def clusters_slice(cl_names)
+      return clusters if cl_names.to_s == 'all'
+      Array.wrap(cl_names).map do |cl_name|
+        cluster(cl_name) or abort("Can't find cluster #{cl_name} in #{self.inspect}")
+      end
     end
   end
 

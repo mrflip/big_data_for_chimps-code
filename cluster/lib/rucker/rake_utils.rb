@@ -2,10 +2,10 @@ module Rucker::RakeUtils
 
   def task_args(name, *param_names, &block)
     task(name, *param_names) do |task, task_params|
-      args = param_names.map{|param| task_params[param] || ENV[param.to_s.capitalize] }
+      args = param_names.map{|param| task_params[param] || ENV[param.to_s.upcase] }
       opts  = {}
       block.call(*args, opts)
-    end.enhance{ Rake::Task[:ps].invoke }
+    end
   end
 
   def container_task(name, &block)

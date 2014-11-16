@@ -62,7 +62,7 @@ clusters:
     # Make it be one hero worker and a pool of 0..n anonymous workers (or just a
     # sea of anonymous workers)
     #
-    - name:         hadoop_worker
+    - name:         hadoop_worker00
       image_name:   "bd4c/hadoop_worker"
       # node mgr:  console http 8042, localizer 8040, ipc 8041
       # data node: console http 50075, ipc 50020, xceiver 50010
@@ -75,7 +75,7 @@ clusters:
         - "/tmp/bulk/hadoop/log:/bulk/hadoop/log:rw"
       volumes_from:
         - "data_hdfs0"
-      hostname:     "worker"
+      hostname:     "worker00"
 
     #
     # Running hue on the lounge so that there's only one URL users need to learn.
@@ -94,7 +94,7 @@ clusters:
       links:
         - "hadoop_nn:nn"
         - "hadoop_rm:rm"
-        - "hadoop_worker:worker"
+        - "hadoop_worker00:worker00"
     
     #
     # Helper images
@@ -108,15 +108,15 @@ clusters:
         - "/var/run/docker.sock:/var/run/docker.sock"
       hostname:     "host-filer"
       
-  # ===========================================================================
-  #
-  # Debugging
-  #
-  debug:    
-    - name:         fiddle
-      image_name:   "bd4c/hadoop_base"
-      hostname:     "fiddle"
-      ports:         [ "9622:22" ]
-      volumes_from:
-        - "data_gold"
+  # # ===========================================================================
+  # #
+  # # Debugging
+  # #
+  # debug:    
+  #   - name:         fiddle
+  #     image_name:   "bd4c/hadoop_base"
+  #     hostname:     "fiddle"
+  #     ports:         [ "9622:22" ]
+  #     volumes_from:
+  #       - "data_gold"
 

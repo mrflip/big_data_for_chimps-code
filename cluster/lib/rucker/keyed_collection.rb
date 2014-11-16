@@ -67,7 +67,7 @@ module Rucker
       of_keys.all?{|key| @clxn.include?(key.to_sym) }
     end
 
-    def missing_keys(keys)
+    def extra_keys(keys)
       keys.map(&:to_sym) - self.keys
     end
 

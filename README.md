@@ -233,6 +233,7 @@ Check that you know where you are:
 * `git remote show origin` shows something like `https://github.com/infochimps-labs/big_data_for_chimps-code.git` (actually right now it's at `https://github.com/mrflip/big_data_for_chimps-code.git`)
 * `git fetch --all origin` succeeds.
 * `git diff origin/master` shows no unexplained differences
+* `git log` shows the same commits that visiting the code repo's github page does.
 * `pwd` shows a directory that ends in `cluster`, a subdirectory of the repo you cloned.
 
 check that docker is happy:
@@ -269,7 +270,7 @@ Check that rake and the rakefile are basically sane:
 
 * Running `rake images:pull` marches through the list fairly quickly, reporting in a bored tone that it already has everything.
 
-* `docker images` shows something like the following:
+* `docker images` shows something like:
 
   ```
     6     bd4c/baseimage          latest          1130650140        1.053 GB      024867a51a963   26 hours ago            -
@@ -294,19 +295,84 @@ Check that rake and the rakefile are basically sane:
 #### Is the helpers cluster running?
 
 * Running `rake ps` shows a `host_filer` container, with status of 'Up (some amount of time)
-* On the docker host, `cat /var/lib/docker/hosts` has entries for 'host-filer' and all other containers you expect to be running.
+* On the docker host, `cat /var/lib/docker/hosts` has entries for 'host-filer' and all other containers you expect to be running; and those entries match
 
-If not,
+If not, the docker-hosts project is at https://github.com/blalor/docker-hosts
+
+**Citizens of the future**: it's quite likely that docker has evolved a superior solution to the hostnames problem, and so this may be the cause and not solution of a conflict.
+
+If you can't get the helpers cluster running correctly, you can instead update the `/etc/hosts` file on each container.
+
+Here is what mine looks like right now, with a single worker running:
+
+```
+127.0.0.1	localhost	localhost4
+172.17.0.107	host-filer
+172.17.0.119	nn
+172.17.0.120	snn
+172.17.0.121	rm
+172.17.0.122	worker00
+172.17.0.123	lounge
+::1	localhost	localhost6	ip6-localhost	ip6-loopback
+fe00::0	ip6-localnet
+ff00::0	ip6-mcastprefix
+ff02::1	ip6-allnodes
+ff02::2	ip6-allrouters
+```
+
+Those will **not be the actual IP addresses** -- there are instructions for finding them, below.
+
+What matters most is that on the namenode, all worker IPs resolve to hostnames and vice-versa:
+
+```
+chimpy@nn:~$ getent hosts 172.17.0.122
+172.17.0.122    worker00
+chimpy@nn:~$ getent hosts worker00
+172.17.0.122    worker00
+chimpy@nn:~$ getent hosts google.com
+173.194.115.73  google.com
+173.194.115.69  google.com
+```
 
 #### Are the data volumes in place?
 
+* `rake info[all,volumes]` should show at least these six volumes, in a stopped state:
+  
+  ```
+  name                    state   ip_address      hostname        image_name              volumes
+  data_gold               stopped                                 bd4c/data_gold          /data/gold
+  data_outd               stopped                                 bd4c/data_outd          /data/outd
+  data_hue                stopped                                 bd4c/data_hue           /bulk/hadoop/hue
+  data_nn                 stopped                                 bd4c/data_nn            /bulk/hadoop/name
+  data_hdfs0              stopped                                 bd4c/data_hdfs0         /bulk/hadoop/hdfs
+  home_chimpy             stopped                                 bd4c/home_chimpy        /home/chimpy
+  ```
+
+Is the correct data present?
+
+* Running `rake data:inspector` will run a machine that mounts all volumes in the data cluster
+* On the inspector node, running `du -sm /data/gold /data/outd /bulk/hadoop/{hue,name,hdfs} /home/chimpy` returns
+
+  ```
+  386	/data/gold
+  1	/data/outd
+  1	/bulk/hadoop/hue
+  5	/bulk/hadoop/name
+  210	/bulk/hadoop/hdfs
+  124	/home/chimpy
+  ```
+
+These totals will probably have changed somewhat since the last edit of the readme, but the relative sizes should resemble the above
 
 #### Is the namenode working?
 
-* http://localhost:50070/dfshealth.html#tab-datanode opens an returns content (Yay the namenode is working)
-* http://localhost:8088/cluster/nodes
+* `rake info` should show the `hadoop_nn` container in the running state
 
-* `rake ps` should show
+
+* http://$DOCKER_IP:50070/dfshealth.html#tab-datanode opens and returns content (Yay the namenode is working)
+* http://$DOCKER_IP:8088/cluster/nodes should show at least one datanode and no unhealthy datanodes
+
+If those pages don't open, 
 
 
 
