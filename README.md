@@ -364,17 +364,97 @@ Is the correct data present?
 
 These totals will probably have changed somewhat since the last edit of the readme, but the relative sizes should resemble the above
 
-#### Is the namenode working?
+#### Access the lounge
+
+* SSH to the machine from your host using `ssh -i insecure_key.pem -p 9422 root@namenode_ip_address` should work. If not, try it from the docker host: 
+  - Note the ip_address shown in `rake info`
+  - copy the contents of `insecure_key.pem` to the same-named file on the docker host.
+  - Visit the docker host machine (`boot2docker ssh` or whatever)
+  - From there, run `ssh -i insecure_key.pem -p 9422 root@ip_address_shown_above`
+
+* Listing the HDFS directory with `hadoop fs -ls /` should show several directories, including `/tmp`, `/user` and `/data`.
+  - Running `hadoop fs -du /data` should show many megabytes of usage
+* Copying a new file onto the HDFS with `hadoop fs -cp /etc/passwd ./file.txt` should succeed
+* Displaying that file with `hadoop fs -cat ./file.txt` should show what you copied
+
+* Listing the running jobs with `hadoop jobs
+
+* The cluster should have active 
+
+  ```
+  chimpy@nn:~$ mapred job -list-active-trackers
+  14/11/16 05:56:09 INFO client.RMProxy: Connecting to ResourceManager at rm/172.17.0.162:8032
+  tracker_worker00:37823
+  ```
+
+#### Is the HDFS working?
+
+* The cluster should be **out** of safemode: `hdfs dfsadmin -safemode get` should report `Safe mode is OFF`.
+
+* The HDFS report from  `hdfs dfsadmin -report` should show
+  - the expected number of datanodes,
+  - no missing, corrupt or under-replicated blocks,
+  - a healthy amount of DFS space remaining
+  - the amount of DFS used should match the size of the contents of the HDFS
+
+The direct namenode console at http://$DOCKER_IP:50070/dfshealth.html#tab-overview should open and returns content. If so, the namenode is working and you can access it.
+
+```
+Safemode is off.
+92 files and directories, 69 blocks = 161 total filesystem object(s).
+Heap Memory used 96.32 MB of 160.5 MB Heap Memory. Max Heap Memory is 889 MB.
+Non Heap Memory used 34.32 MB of 35.44 MB Commited Non Heap Memory. Max Non Heap Memory is 130 MB.
+DFS Used:	209.48 MB
+Non DFS Used:	31.35 GB
+DFS Remaining:	25.07 GB
+DFS Remaining%:	44.27%
+Live Nodes	1 (Decommissioned: 0)
+Dead Nodes	0 (Decommissioned: 0)
+```
+
+* `Safemode is off` is actually what you want to see; if `Safemode is on`, then you do not have enough datanodes.
+* 'Live Nodes' should match the number of worker nodes, and Dead Nodes should be zero.
+* 'DFS Remaining' should be a healthy number of GB, and
+* 'DFS Used', and the number of files and directories, should match the quantity of data you've placed on the HDFS.
 
 * `rake info` should show the `hadoop_nn` container in the running state
 
+* SSH'ing to the machine on port 9422 should give you a shell prompt.
 
-* http://$DOCKER_IP:50070/dfshealth.html#tab-datanode opens and returns content (Yay the namenode is working)
-* http://$DOCKER_IP:8088/cluster/nodes should show at least one datanode and no unhealthy datanodes
+* When you SSH to the machine, running `ps auxf` should show the following:
 
-If those pages don't open, 
+  ```
+  USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+  root         1  0.0  0.1  28820  8488 ?        Ss   05:07   0:00 /usr/bin/python3 -u /sbin/my_init
+  root      1943  0.0  0.0    192    36 ?        S    05:07   0:00 /usr/bin/runsvdir -P /etc/service
+  root      1944  0.0  0.0    172     4 ?        Ss   05:07   0:00  \_ runsv hadoop_nn
+  root      1946  0.0  0.0    188     4 ?        S    05:07   0:00  |   \_ svlogd -tt /bulk/hadoop/log/namenode-daemon
+  hdfs      1948  7.3  3.8 1602656 233380 ?      Sl   05:07   0:12  |   \_ /usr/lib/jvm/java-7-oracle/bin/java -Dproc_namenode ...
+  root      1945  0.0  0.0    172     4 ?        Ss   05:07   0:00  \_ runsv sshd
+  root      1947  0.0  0.0  61368  5328 ?        S    05:07   0:00      \_ /usr/sbin/sshd -D
+  root      2033  0.5  0.0  63928  5540 ?        Ss   05:09   0:00          \_ sshd: chimpy [priv] 
+  chimpy    2035  0.0  0.0  63928  2888 ?        S    05:09   0:00              \_ sshd: chimpy@pts/0  
+  chimpy    2036  0.0  0.0  21312  3740 pts/0    Ss   05:09   0:00                  \_ -bash
+  chimpy    2051  0.0  0.0  18688  2612 pts/0    R+   05:09   0:00                      \_ ps axuf
+  ```
+
+* The START time of the java process should be about the same as the my_init process. If not, something made the script crash.
+
+* Scan the logs: `tail -F -n 400 /bulk/hadoop/log/namenode-daemon/current`. Scan forward from the
+  most recent line reading "`Namenode runit script invoked at ...`". You should see no Java backtraces
+  and no messages at `ERROR` status
+
+* If those pages don't open, try accessing them from the docker host:
+  - Visit the docker host machine (`boot2docker ssh` or whatever)
+  - `curl http://$(hostname):50070/dfshealth.html`
+  The curl command should dump a whole bunch of HTML to the screen.
 
 
+If SSH or web access works from the docker machine but not from its host machine, port forwarding is probably not set up correctly.
+
+### Is the Resource Manager working?
+
+* http://$DOCKER_IP:8088/cluster/nodes should show at least one datanode and no unhealthy datanodes.
 
 ### Datanode working?
 
