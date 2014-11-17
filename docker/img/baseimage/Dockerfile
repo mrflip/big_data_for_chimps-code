@@ -24,7 +24,9 @@ RUN                                                               \
   route -n | awk '/^0.0.0.0/ {print $2}' > /etc/docker_host_ip && \
   echo "************ Docker Host: " && cat /etc/docker_host_ip
 
-# !!! Do we keep this, or leave it?
+#
+# NOTE: INSECURE THING IS INSECURE
+#
 RUN /usr/sbin/enable_insecure_key && /etc/my_init.d/00_regen_ssh_host_keys.sh
 
 # # Use the deb-proxy cache started in helper

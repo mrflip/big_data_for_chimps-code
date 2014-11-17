@@ -12,6 +12,11 @@ images:
   "bd4c/volume_boxer":     "./img/volume_boxer"
   # "bd4c/deb_proxy":        "./img/deb_proxy"
 
-containers: {}
-clusters: {}
+containers:
+  hadoop_base: 'bd4c/hadoop_base'
+
+
+clusters:
+  hadoop:
+    - hadoop_base
 groups: {}
