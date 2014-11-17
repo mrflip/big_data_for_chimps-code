@@ -474,8 +474,6 @@ If the machines seem to be working, and the daemons seem to be running, this is 
 hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
 ```
 
-
-
 ## Docker stuff
 
 `rake -P` will list all the things rake knows how to do
@@ -483,8 +481,6 @@ hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
 * `rake docker:df`         -- runs boot2docker to get the free space on the docker host
 * `rake docker:rm_stopped` -- DANGEROUS -- removes all stopped containers.
 * `rake docker:rmi_blank`  -- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate stages of old builds and left unchecked they will buil This command will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
-
-
 
 ```
     docker run				      \
@@ -496,3 +492,21 @@ hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
       --name hadoop_worker.tmp
 
 ```
+
+### Halp my docker disk is full
+
+
+The combined size of all the compute images (`baseimage`, `hadoop_base`, `hadoop_nn`, `hadoop_snn`, `hadoop_rm`, `hadoop_worker`, `hadoop_lounge`) is a bit under 3GB -- all of the latter are built from hadoop_base, and so re-use the common footprint of data.
+
+The data volumes take up about 1-2GB more. These are representative sizes:
+
+```
+Filesystem                Size      Used Available Use% Mounted on
+rootfs                    5.2G    204.6M      5.0G   4% /
+...
+/dev/sda1                26.6G      4.0G     19.7G  15% /mnt/sda1/var/lib/docker/aufs
+```
+
+The `rake docker:rmi_blank` command will remove all images that are not part of any tagged image. If you are building and rebuilding containers, the number of intermediate layers from discarded early versions can start to grow; `rake docker:rmi_blank` removes those, leaving all the named layers you actually use.
+
+If you have cleared out all the untagged images, and checked that logs and other foolishness isn't the problem, you might be falling afoul of a bug in current versions of docker (1.3.0). It leads to [large numbers of dangling volumes](https://github.com/docker/docker/issues/6354) -- github/docker [issue #6534](https://github.com/docker/docker/issues/6354) has workarounds.

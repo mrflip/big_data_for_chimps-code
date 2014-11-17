@@ -10,9 +10,10 @@ echo "======== begin " ;
 
 du --exclude=proc -smc / ; echo "======== basics " ; 
 
-# commandline tools we want on any machine we'll have to debug (~ 46MB)
+# commandline tools we want on any machine we'll have to debug (~ 71MB)
 $safe_apt_install                                         \
   aptitude colordiff elinks git host less locate man nano \
+  dstat htop ifstat netcat-openbsd nmap openssl rsync     \
   sudo tar tree unzip vim wget zip 
 
 ## The rest of this we can kick to the client install later
@@ -31,10 +32,6 @@ $safe_apt_install                                                 \
   libssl-dev  libxml2-dev libxml2-dev libxml2-utils libxslt-dev   \
   libxslt1-dev libxslt1-dev libyaml-dev libyaml-dev zlib1g-dev
 
-du --exclude=proc -smc / ; echo "======== diagnostics*"
-
-# diagnostics (~ 25 MB)
-$safe_apt_install dstat htop ifstat netcat-openbsd nmap openssl rsync
 
 du --exclude=proc -smc / ; echo "======== python"
 
