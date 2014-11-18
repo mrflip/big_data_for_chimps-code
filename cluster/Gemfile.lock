@@ -1,17 +1,24 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    archive-tar-minitar (0.5.2)
     childprocess (0.5.5)
       ffi (~> 1.0, >= 1.0.11)
     coderay (1.1.0)
     configliere (0.4.22)
       highline (= 1.5.2)
       multi_json (~> 1.10.1)
+    docker-api (1.15.0)
+      archive-tar-minitar
+      excon (>= 0.38.0)
+      json
+    excon (0.41.0)
     ffi (1.9.6)
     gorillib (0.6.0)
       configliere (>= 0.4.13)
       multi_json (>= 1.1)
     highline (1.5.2)
+    json (1.8.1)
     method_source (0.8.2)
     multi_json (1.10.1)
     pry (0.10.1)
@@ -26,6 +33,7 @@ PLATFORMS
 
 DEPENDENCIES
   childprocess
+  docker-api
   gorillib (~> 0.6)
   multi_json (>= 1.1)
   pry (~> 0.10)

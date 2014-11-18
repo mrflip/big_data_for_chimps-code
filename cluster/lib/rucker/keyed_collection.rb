@@ -10,6 +10,8 @@ module Rucker
   # * items are uniquely labeled by their #collection_key method (and optionally
   #   have a #set_collection_key= method to set it)
   #
+  # * Keys are always symbols, but you can retrieve by string or symbol.
+  #
   # * items share a common type: "a post has many `Comment`s".
   #
   # * items may want to hold a reference back to the containing model
@@ -27,17 +29,17 @@ module Rucker
     attr_reader :clxn
     protected   :clxn
     # [Gorillib::Model] The model class that items instantiate
-    attr_reader :model
-    protected   :model
+    attr_reader :item_type
+    protected   :item_type
 
     # Object that owns this collection
     attr_reader :belongs_to
 
-    # include Gorillib::Model
     def initialize(opts={})
       @clxn       = Hash.new
-      @model      = opts[:of] or raise(ArgumentError, "#{self.class} requires a model")
-      @belongs_to = opts[:belongs_to] if opts[:belongs_to]
+      @item_type  = opts[:item_type] or raise(ArgumentError, "#{self.class} requires an :item_type prescribing the objects it holds")
+      @belongs_to = opts[:belongs_to] if opts[:belongs_to].present?
+      receive!(opts[:values])         if opts[:values].present?
     end
 
     # Adds an item in-place using the value of item.collection_key.  Items
@@ -54,7 +56,7 @@ module Rucker
     # receive_item, not directly to add. This lets you do type correction to
     # things coming from eg. a JSON object
     def receive_item(item, key=nil)
-      item = model.receive(item)
+      item = item_type.receive(item)
       item.set_collection_key(key) if key.present?
       add(item)
     end
@@ -75,7 +77,6 @@ module Rucker
     # Barebones enumerable methods
     #
 
-    delegate :[], :fetch, :delete, :include?,         :to => :clxn
     delegate :keys, :values, :each_pair, :each_value, :to => :clxn
     delegate :length, :size, :empty?, :blank?,        :to => :clxn
 
@@ -97,12 +98,24 @@ module Rucker
       self
     end
 
-    # calls #set_collection_key on the item
+    # @see    Hash#[]
+    # @return item with the given key
+    def [](key)                   clxn[key.to_sym] ; end
+    # @see Hash#fetch
+    def fetch(key, *args, &blk)   clxn.fetch(key.to_sym, *args, &blk) ; end
+    # @see Hash#delete
+    def delete(key, *args, &blk) clxn.delete(key.to_sym, *args, &blk) ; end
+    # @see Hash#include?
+    # @return [True,False] true if an item with that key is in the collection
+    def include?(key)             clxn.include?(key.to_sym) ; end
+
+    # calls #set_collection_key on the item and adds
     def []=(key, item)
       item.set_collection_key(key)
       add(item)
     end
 
+    # @return items with the given keys, or all items for the special key `:all`
     def slice(*keys)
       if keys == [:_all]
         self.to_a
@@ -124,7 +137,7 @@ module Rucker
     # @return [Gorillib::Collection] the collection
     def receive!(other)
       if other.respond_to?(:each_pair)
-        other.each_pair{|key, item| receive_item(item, key) }
+        other.each_pair{|key, item|  receive_item(item, key) }
       elsif other.respond_to?(:each)
         other.each{|item|           receive_item(item) }
       else
@@ -135,10 +148,9 @@ module Rucker
 
     # Create a new collection and add the given items to it
     # (if given an existing collection, just returns it directly)
-    def self.receive(items, *args)
-      return items if native?(items)
-      coll = self.new(*args)
-      coll.receive!(items)
+    def self.receive(values)
+      return values if native?(values)
+      coll = self.new(values)
       coll
     end
 
@@ -169,13 +181,32 @@ module Rucker
     # @return [String] string describing the collection's array representation
     def inspect
       key_width = [keys.map{|key| key.to_s.length + 1 }.max.to_i, 45].min
-      guts = clxn.map{|key, val| "%-#{key_width}s %s" % ["#{key}:", val.inspect] }.join(",\n   ")
-      ["c##{model}{ ", guts, ' }'].join
+      guts = clxn.map{|key, val| "%-#{key_width}s %s" % ["#{key}:", val.inspect] }.join(",\n  ")
+      bump = (length >= 2 ? "\n  " : "")
+      ["c##{item_type}{ ", bump, guts, ' }'].join
     end
 
     def inspect_compact
       ["c{ ", keys.join(", "), ' }'].join
     end
-
   end
+
+  #
+  # A keyed collection whose membership is expected to 
+  # remain unchanged after creation.
+  #
+  class FixedCollection < KeyedCollection
+    protected :add
+    protected :receive_item
+    protected :receive!
+    protected :delete
+    protected :<< ;
+    protected :[]= ;
+
+    def initialize(*args, &blk)
+      super
+      @clxn.freeze!
+    end
+  end
+  
 end

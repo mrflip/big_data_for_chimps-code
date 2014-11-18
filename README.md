@@ -13,6 +13,12 @@ You will now see a directory called `bd4c-code`
 
 Everything below (apart from one quick step) should take place in the `bd4c-code/cluster/` directory. **DO NOT USE THE `bd4c-code/docker/` DIRECTORY** -- that is for generating the docker containers, and you will want to use the pre-validated ones to start off.
 
+For the experienced and reckless, there's a compact summary version following the walkthrough; and if you hit a hitch, extensive troubleshooting notes follow. We've frequently experienced the pain of trying to run sample code from a book where minor shifts in the underlying technology have broken the code in some baffling way; and the technology here is still changing quickly and particularly complex. So we've added "progress checks" throughout this document and the notes/Troubleshooting.md document: ways to firewall a problem with one piece (eg. getting hostnames distributed to each node) from problems in the next piece (eg. provisioning the pre-assembled volumes). That way, when bitrot does eventually happen -- or if you have a setup that provides the capability some other way -- you only have to ensure that progress checks are satisfied.
+
+* /README.md -- walkthrough and summary
+* /notes/Troubleshooting.md -- detailed checks on each component
+
+
 
 ## Dockering I: Preliminaries
 
@@ -81,17 +87,22 @@ You can do the next step while that proceeds.
 
 ### Minor setup needed on the docker host
 
-The namenode insists on being able to resolve the hostnames of its clients -- something that is far more complex in Dockerland than you'd think. We have a pretty painless solution, but it requires a minor intervention
+The namenode insists on being able to resolve the hostnames of its clients -- something that is far more complex in Dockerland than you'd think.
 
-On the docker host (`boot2docker ssh`, or whatever else it takes):
+For Boot2Docker users, we have a pretty painless solution, but it requires a minor intervention on the docker host. Visit it (`boot2docker ssh`, probably) and run:
 
 ```
 boot2docker ssh                          # or however you get onto the docker host
-mkdir -p          /tmp/bulk/hadoop       # view all logs there
 sudo touch        /var/lib/docker/hosts  # so that docker-hosts can make container hostnames resolvable
 sudo chmod 0644   /var/lib/docker/hosts
 sudo chown nobody /var/lib/docker/hosts
 ```
+
+<!-- We'll also share the log directories onto a volume readable from the docker host and all cluster containers. At no cost, this lets you tail all of the services' logs from one place: -->
+
+<!-- ``` -->
+<!-- mkdir -p          /bulk/hadoop           # You'll be able to view all logs here -->
+<!-- ``` -->
 
 Leave a terminal window open on the docker host, as we'll do a couple more things over there.
 
@@ -106,10 +117,9 @@ Don't proceed past this point until the `rake images:pull` has succeeded. Time f
 You're ready to proceed when:
 
 * Running `echo $DOCKER_HOST` from your terminal returns the address of your docker host
+* Running `rake ps` succeeds and shows no containers running.
 * Running `rake images:pull` marches through the list fairly quickly, reporting in a bored tone that it already has everything.
-* On the docker host, `ls -l /var/lib/docker/hosts` shows a file of zero size.
-* Running `decking` (with no args) reports '`Version: 0.2.1-bd4c`'
-* Running `rake ps` shows no containers running.
+* For boot2docker users, `ls -l /var/lib/docker/hosts` on the docker host shows a file of zero size. For others, you have a 
 
 Alright! Now the fun starts.
 
@@ -183,11 +193,11 @@ All of the nodes in the cluster are available for ssh. Using the normal SSH port
 
 We've done something here that usually violates taste, reason and safety: the private key that controls access to the container is available to anyone with a browse. To bring that point home, the key is named `insecure_key.pem`. Our justification is that these machines are (a) designed to work within the private confines of a VM, without direct inbound access from the internet, and (b) are low-stakes playgrounds with only publicly redistributable code and data sets. If either of those assumptions becomes untrue -- you are pushing to the docker cloud, or using these machines to work with data of your own, or whatever -- then we urge you to construct new private/public keypairs specific _only_ to each machine, replacing the `/root/.ssh/authorized_keys` and `/home/chimpy/.ssh/authorized_keys` files. (It's those latter files that grant access; the existing key must be removed and a new one added to retain access.) It's essential that any private keys you generate be unique to these machines: it's too easy to ship a container to the wrong place or with the wrong visibility at the current maturity of these tools. So don't push in the same key you use for accessing work servers or github or docker or the control network for your secret offshore commando HQ.
 
-## I WANT TO SEE DATA GO, YOU PROMISED
+### I WANT TO SEE DATA GO, YOU PROMISED
 
 Right you are. There's tons of examples in the book, of course, but let's make some data fly now and worry about the details later.
 
-### See pig in action
+#### See pig in action
 
 On hadoop:
 
@@ -219,294 +229,11 @@ pig -x local 04-intro_to_pig/a-ufo_visits_by_month.pig
 colordiff -uw /data/outd/ufos/sightings_hist{-reference.tsv,/part*} && echo 'No diffference'
 ```
 
-## Troubleshooting
 
-The rake tasks are just scripts around the `docker` command, and print each command they execute before running them, and again afterwards if the command failed.
+## Commanding the Cluster -- tl;dr Quickie Version
 
+Here's the summary in brief. Any doubts or problems, rewind and walk through the instructions below.
 
-### Checklist
-
-#### Is your commandline environment complete and correct?
-
-Check that you know where you are:
-
-* `git remote show origin` shows something like `https://github.com/infochimps-labs/big_data_for_chimps-code.git` (actually right now it's at `https://github.com/mrflip/big_data_for_chimps-code.git`)
-* `git fetch --all origin` succeeds.
-* `git diff origin/master` shows no unexplained differences
-* `git log` shows the same commits that visiting the code repo's github page does.
-* `pwd` shows a directory that ends in `cluster`, a subdirectory of the repo you cloned.
-
-check that docker is happy:
-
-* Running `boot2docker up` tells you that all your environment variables are happy. (It's safe to run this more than once)
-* Running `echo $DOCKER_HOST` from your terminal returns the address of your docker host
-* Running `docker ps` shows a first line reading `CONTAINER ID   IMAGE     COMMAND ...`
-
-Check that ruby is happy:
-
-* `ruby --version` shows `1.9.2` or more recent (preferably `2.something`). If not, consult the internet for instructions on installing ruby.
-
-Check that your gems are installed correctly:
-
-* `bundle --version` shows `1.7.6` or better. If not, run `gem install bundler`.
-* `git status` shows no differences in Gemfile or Gemfile.lock from the mainline repo. If not, check out an unchanged version and run `bundle install` (and not, for example, `bundle update`)
-* `bundle install` shows a bunch of lines saying 'Using ...' (not 'Installing ...') and finishes with 'Your bundle is complete!'.
-* `rake --version` completes and shows `10.3` or better.
-
-Check that rake and the rakefile are basically sane:
-
-* `rake -T` returns content like
-
-   ```
-   rake data:create[container]       # Create the given container, or all in the data cluster with data:create[all]
-   rake data:delete_data[container]  # Removes the given containers, or all in the data cluster with data:delete_data[all]
-   rake df                           # Uses boot2docker to find the disk free space of the docker host
-   rake hadoop:rm[container]         # Remove the given container, or all in the hadoop cluster with hadoop:rm[all]
-   ```
-
-* `rake ps` shows the same basic info as `docker ps`.
-
-#### Do you have the right images?
-
-* Running `rake images:pull` marches through the list fairly quickly, reporting in a bored tone that it already has everything.
-
-* `docker images` shows something like:
-
-  ```
-    6     bd4c/baseimage          latest          1130650140        1.053 GB      024867a51a963   26 hours ago            -
-    9     bd4c/data_gold          latest           515584819        491.7 MB      419705640c68d   28 hours ago            -
-   19     bd4c/data_hdfs0         latest           322227404        307.3 MB      503690dc75293   39 hours ago            -
-    7     bd4c/data_hue           latest            92536832        88.25 MB      054799fcb4bea   27 hours ago            -
-   15     bd4c/data_nn            latest            96720650        92.24 MB      6431a7bc41c16   33 hours ago            -
-   12     bd4c/data_outd          latest            92327116        88.05 MB      798c7aea9b31b   28 hours ago            -
-    5     bd4c/hadoop_base        latest          1314259992        1.224 GB      4f6e4def7638f   26 hours ago            -
-    0     bd4c/hadoop_lounge      latest          1900523028         1.77 GB      e4176c0a41572   26 hours ago            -
-    4     bd4c/hadoop_nn          latest          1318554959        1.228 GB      2701a8c4dbda1   26 hours ago            -
-    3     bd4c/hadoop_rm          latest          1317481218        1.227 GB      509a118c6b911   26 hours ago            -
-    2     bd4c/hadoop_snn         latest          1317481218        1.227 GB      f8b74aecb6927   26 hours ago            -
-    1     bd4c/hadoop_worker      latest          1319628701        1.229 GB      17465e5f6811e   26 hours ago            -
-   13     bd4c/home_chimpy        latest           225234124        214.8 MB      e2b36f311e76a   28 hours ago            -
-   20     bd4c/volume_boxer       latest            92316631        88.04 MB      b62e15f22f9d8   42 hours ago            -
-   34     blalor/docker-hosts     latest           345400934        329.4 MB      98e7ca605530c   3 months ago            -
-   27     phusion/baseimage       0.9.15           303457894        289.4 MB      cf39b476aeec4   6 weeks ago             -
-   33     radial/busyboxplus      git               13484687        12.86 MB      30326056bb14d   8 weeks ago             -
-  ```
-
-#### Is the helpers cluster running?
-
-* Running `rake ps` shows a `host_filer` container, with status of 'Up (some amount of time)
-* On the docker host, `cat /var/lib/docker/hosts` has entries for 'host-filer' and all other containers you expect to be running; and those entries match
-
-If not, the docker-hosts project is at https://github.com/blalor/docker-hosts
-
-**Citizens of the future**: it's quite likely that docker has evolved a superior solution to the hostnames problem, and so this may be the cause and not solution of a conflict.
-
-If you can't get the helpers cluster running correctly, you can instead update the `/etc/hosts` file on each container.
-
-Here is what mine looks like right now, with a single worker running:
+Initial start:
 
 ```
-127.0.0.1	localhost	localhost4
-172.17.0.107	host-filer
-172.17.0.119	nn
-172.17.0.120	snn
-172.17.0.121	rm
-172.17.0.122	worker00
-172.17.0.123	lounge
-::1	localhost	localhost6	ip6-localhost	ip6-loopback
-fe00::0	ip6-localnet
-ff00::0	ip6-mcastprefix
-ff02::1	ip6-allnodes
-ff02::2	ip6-allrouters
-```
-
-Those will **not be the actual IP addresses** -- there are instructions for finding them, below.
-
-What matters most is that on the namenode, all worker IPs resolve to hostnames and vice-versa:
-
-```
-chimpy@nn:~$ getent hosts 172.17.0.122
-172.17.0.122    worker00
-chimpy@nn:~$ getent hosts worker00
-172.17.0.122    worker00
-chimpy@nn:~$ getent hosts google.com
-173.194.115.73  google.com
-173.194.115.69  google.com
-```
-
-#### Are the data volumes in place?
-
-* `rake info[all,volumes]` should show at least these six volumes, in a stopped state:
-  
-  ```
-  name                    state   ip_address      hostname        image_name              volumes
-  data_gold               stopped                                 bd4c/data_gold          /data/gold
-  data_outd               stopped                                 bd4c/data_outd          /data/outd
-  data_hue                stopped                                 bd4c/data_hue           /bulk/hadoop/hue
-  data_nn                 stopped                                 bd4c/data_nn            /bulk/hadoop/name
-  data_hdfs0              stopped                                 bd4c/data_hdfs0         /bulk/hadoop/hdfs
-  home_chimpy             stopped                                 bd4c/home_chimpy        /home/chimpy
-  ```
-
-Is the correct data present?
-
-* Running `rake data:inspector` will run a machine that mounts all volumes in the data cluster
-* On the inspector node, running `du -sm /data/gold /data/outd /bulk/hadoop/{hue,name,hdfs} /home/chimpy` returns
-
-  ```
-  386	/data/gold
-  1	/data/outd
-  1	/bulk/hadoop/hue
-  5	/bulk/hadoop/name
-  210	/bulk/hadoop/hdfs
-  124	/home/chimpy
-  ```
-
-These totals will probably have changed somewhat since the last edit of the readme, but the relative sizes should resemble the above
-
-#### Access the lounge
-
-* SSH to the machine from your host using `ssh -i insecure_key.pem -p 9422 root@namenode_ip_address` should work. If not, try it from the docker host: 
-  - Note the ip_address shown in `rake info`
-  - copy the contents of `insecure_key.pem` to the same-named file on the docker host.
-  - Visit the docker host machine (`boot2docker ssh` or whatever)
-  - From there, run `ssh -i insecure_key.pem -p 9422 root@ip_address_shown_above`
-
-* Listing the HDFS directory with `hadoop fs -ls /` should show several directories, including `/tmp`, `/user` and `/data`.
-  - Running `hadoop fs -du /data` should show many megabytes of usage
-* Copying a new file onto the HDFS with `hadoop fs -cp /etc/passwd ./file.txt` should succeed
-* Displaying that file with `hadoop fs -cat ./file.txt` should show what you copied
-
-* Listing the running jobs with `hadoop jobs
-
-* The cluster should have active 
-
-  ```
-  chimpy@nn:~$ mapred job -list-active-trackers
-  14/11/16 05:56:09 INFO client.RMProxy: Connecting to ResourceManager at rm/172.17.0.162:8032
-  tracker_worker00:37823
-  ```
-
-#### Is the HDFS working?
-
-* The cluster should be **out** of safemode: `hdfs dfsadmin -safemode get` should report `Safe mode is OFF`.
-
-* The HDFS report from  `hdfs dfsadmin -report` should show
-  - the expected number of datanodes,
-  - no missing, corrupt or under-replicated blocks,
-  - a healthy amount of DFS space remaining
-  - the amount of DFS used should match the size of the contents of the HDFS
-
-The direct namenode console at http://$DOCKER_IP:50070/dfshealth.html#tab-overview should open and returns content. If so, the namenode is working and you can access it.
-
-```
-Safemode is off.
-92 files and directories, 69 blocks = 161 total filesystem object(s).
-Heap Memory used 96.32 MB of 160.5 MB Heap Memory. Max Heap Memory is 889 MB.
-Non Heap Memory used 34.32 MB of 35.44 MB Commited Non Heap Memory. Max Non Heap Memory is 130 MB.
-DFS Used:	209.48 MB
-Non DFS Used:	31.35 GB
-DFS Remaining:	25.07 GB
-DFS Remaining%:	44.27%
-Live Nodes	1 (Decommissioned: 0)
-Dead Nodes	0 (Decommissioned: 0)
-```
-
-* `Safemode is off` is actually what you want to see; if `Safemode is on`, then you do not have enough datanodes.
-* 'Live Nodes' should match the number of worker nodes, and Dead Nodes should be zero.
-* 'DFS Remaining' should be a healthy number of GB, and
-* 'DFS Used', and the number of files and directories, should match the quantity of data you've placed on the HDFS.
-
-* `rake info` should show the `hadoop_nn` container in the running state
-
-* SSH'ing to the machine on port 9422 should give you a shell prompt.
-
-* When you SSH to the machine, running `ps auxf` should show the following:
-
-  ```
-  USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-  root         1  0.0  0.1  28820  8488 ?        Ss   05:07   0:00 /usr/bin/python3 -u /sbin/my_init
-  root      1943  0.0  0.0    192    36 ?        S    05:07   0:00 /usr/bin/runsvdir -P /etc/service
-  root      1944  0.0  0.0    172     4 ?        Ss   05:07   0:00  \_ runsv hadoop_nn
-  root      1946  0.0  0.0    188     4 ?        S    05:07   0:00  |   \_ svlogd -tt /bulk/hadoop/log/namenode-daemon
-  hdfs      1948  7.3  3.8 1602656 233380 ?      Sl   05:07   0:12  |   \_ /usr/lib/jvm/java-7-oracle/bin/java -Dproc_namenode ...
-  root      1945  0.0  0.0    172     4 ?        Ss   05:07   0:00  \_ runsv sshd
-  root      1947  0.0  0.0  61368  5328 ?        S    05:07   0:00      \_ /usr/sbin/sshd -D
-  root      2033  0.5  0.0  63928  5540 ?        Ss   05:09   0:00          \_ sshd: chimpy [priv] 
-  chimpy    2035  0.0  0.0  63928  2888 ?        S    05:09   0:00              \_ sshd: chimpy@pts/0  
-  chimpy    2036  0.0  0.0  21312  3740 pts/0    Ss   05:09   0:00                  \_ -bash
-  chimpy    2051  0.0  0.0  18688  2612 pts/0    R+   05:09   0:00                      \_ ps axuf
-  ```
-
-* The START time of the java process should be about the same as the my_init process. If not, something made the script crash.
-
-* Scan the logs: `tail -F -n 400 /bulk/hadoop/log/namenode-daemon/current`. Scan forward from the
-  most recent line reading "`Namenode runit script invoked at ...`". You should see no Java backtraces
-  and no messages at `ERROR` status
-
-* If those pages don't open, try accessing them from the docker host:
-  - Visit the docker host machine (`boot2docker ssh` or whatever)
-  - `curl http://$(hostname):50070/dfshealth.html`
-  The curl command should dump a whole bunch of HTML to the screen.
-
-
-If SSH or web access works from the docker machine but not from its host machine, port forwarding is probably not set up correctly.
-
-### Is the Resource Manager working?
-
-* http://$DOCKER_IP:8088/cluster/nodes should show at least one datanode and no unhealthy datanodes.
-
-### Datanode working?
-
-On the worker machine:
-
-* `elinks http://$(hostname):50075/` loads, shows you 'DataNode on'
-
-
-## Troubleshooting
-
-
-### Example Straight-Hadoop job
-
-If the machines seem to be working, and the daemons seem to be running, this is a test of whether Hadoop works
-
-```
-hadoop jar /usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 1 100000
-```
-
-## Docker stuff
-
-`rake -P` will list all the things rake knows how to do
-
-* `rake docker:df`         -- runs boot2docker to get the free space on the docker host
-* `rake docker:rm_stopped` -- DANGEROUS -- removes all stopped containers.
-* `rake docker:rmi_blank`  -- DANGEROUS -- removes all images that have no tag. Usually, these are intermediate stages of old builds and left unchecked they will buil This command will give an error message if any such are running; use the `rake docker:rm_stopped` or stop any containers first.
-
-```
-    docker run				      \
-      -p 9122:22 -p 8042:8042 -p 50075:50075      \
-      -v /tmp/bulk/hadoop/log:/bulk/hadoop/log:rw \
-      --volumes-from /data_hdfs0                  \
-      --link hadoop_rm:rm --link hadoop_nn:nn     \
-      --rm -it bd4c/hadoop_worker		      \
-      --name hadoop_worker.tmp
-
-```
-
-### Halp my docker disk is full
-
-
-The combined size of all the compute images (`baseimage`, `hadoop_base`, `hadoop_nn`, `hadoop_snn`, `hadoop_rm`, `hadoop_worker`, `hadoop_lounge`) is a bit under 3GB -- all of the latter are built from hadoop_base, and so re-use the common footprint of data.
-
-The data volumes take up about 1-2GB more. These are representative sizes:
-
-```
-Filesystem                Size      Used Available Use% Mounted on
-rootfs                    5.2G    204.6M      5.0G   4% /
-...
-/dev/sda1                26.6G      4.0G     19.7G  15% /mnt/sda1/var/lib/docker/aufs
-```
-
-The `rake docker:rmi_blank` command will remove all images that are not part of any tagged image. If you are building and rebuilding containers, the number of intermediate layers from discarded early versions can start to grow; `rake docker:rmi_blank` removes those, leaving all the named layers you actually use.
-
-If you have cleared out all the untagged images, and checked that logs and other foolishness isn't the problem, you might be falling afoul of a bug in current versions of docker (1.3.0). It leads to [large numbers of dangling volumes](https://github.com/docker/docker/issues/6354) -- github/docker [issue #6534](https://github.com/docker/docker/issues/6354) has workarounds.

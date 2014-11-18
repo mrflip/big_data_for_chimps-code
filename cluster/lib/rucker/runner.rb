@@ -28,6 +28,19 @@ module Rucker
   end
 
   class ImageRunner
+
+    # # From https://github.com/swipely/docker-api/blob/master/lib/docker/util.rb
+    # # Modified to add the
+    # def create_dir_tar(directory)
+    #   cwd = FileUtils.pwd
+    #   tempfile_name = Dir::Tmpname.create('out') {}
+    #   tempfile = File.open(tempfile_name, 'wb+')
+    #   FileUtils.cd(directory)
+    #   Archive::Tar::Minitar.pack('.', tempfile)
+    #   File.new(tempfile.path, 'r')
+    # ensure
+    #   FileUtils.cd(cwd)
+    # end
   end
 
   module ContainerRunner

@@ -7,7 +7,7 @@ include Rucker::RakeUtils
 Pathname.register_paths({
     cluster_layout: './rucker.yaml'
   })
-LAYOUT = Rucker::Layout.load
+WORLD = Rucker::World.load('local')
 
 IMAGE      = ENV['img'] || ENV['image']
 TAG        = ENV['tag']
@@ -30,7 +30,6 @@ desc %Q{Display a compact summary of the cluster.
   Specify additional fields -- [volumes, all_volumes, host_ports, all_ports, links, volumes_from, full_image_id, image_id] --
   by giving either a ':' separated list of fields, or by supplying appropriate env. vars.}
 task_args :info, :container, :fields do |name, fields_str|
-  ctrs = LAYOUT.docker_info(name||'all')
   flds = fields_str.to_s.split(/:\s*/).map(&:to_sym)
 
   flds += [:volumes, :host_ports] if flds.blank?
@@ -40,10 +39,7 @@ task_args :info, :container, :fields do |name, fields_str|
   flds.uniq!
   flds -= [:host_ports] if flds.include?(:all_ports)
   #
-  puts Rucker::Container.dump_header(*flds)
-  ctrs.each do |ctr|
-    puts ctr.dump(*flds)
-  end
+  WORLD.dump_info(name||'all', flds)
 end
 
 
@@ -54,24 +50,25 @@ def cluster_tasks(cl_name)
   namespace cl_name do
     desc "Run the given container, or all in the #{cl_name} cluster with #{cl_name}:run[all]. It must not exist -- see '#{cl_name}:start' and '#{cl_name}:rm'"
     container_task(:run) do |names, opts|
-      LAYOUT.cluster(cl_name).run(names || 'all', opts.merge(detach: true))
+      WORLD.cluster(cl_name).run(names || 'all', opts.merge(detach: true))
     end
 
     desc "Start the given container, or all in the #{cl_name} cluster with #{cl_name}:start[all]. It must previously have been run."
     container_task(:start) do |names, opts|
-      LAYOUT.cluster(cl_name).start(names || 'all', opts)
+      WORLD.cluster(cl_name).start(names || 'all', opts)
     end
 
     desc "Stop the given container, or all in the #{cl_name} cluster with #{cl_name}:stop[all]. Errors are ignored."
     container_task(:stop) do |names, opts|
-      LAYOUT.cluster(cl_name).stop(names || 'all', opts)
+      opts  = opts.reverse_merge(ignore_errors: true)
+      WORLD.cluster(cl_name).stop(names || 'all', opts)
     end
 
     desc "Remove the given container, or all in the #{cl_name} cluster with #{cl_name}:rm[all]. Errors are ignored."
     container_task(:rm) do |names, opts|
       names = Rucker.expect_some('container', names)
       opts  = opts.reverse_merge(ignore_errors: true)
-      LAYOUT.cluster(cl_name).rm(names, opts)
+      WORLD.cluster(cl_name).rm(names, opts)
     end
   end
 end
@@ -86,20 +83,20 @@ namespace :data do
   desc "Create the given container, or all in the data cluster with data:create[all]. The containers must not already exist."
   container_task(:create) do |names, opts|
     opts  = opts.reverse_merge(ignore_errors: false)
-    LAYOUT.cluster(:data).run(names || 'all', opts)
+    WORLD.cluster(:data).run(names || 'all', opts)
   end.enhance{ Rake::Task[:info].invoke }
 
   desc "Removes the given containers, or all in the data cluster with data:delete_data[all]"
   container_task(:delete_data) do |names, opts|
     names = Rucker.expect_some('container', names)
     opts  = opts.reverse_merge(ignore_errors: true)
-    LAYOUT.cluster(:data).rm(names, opts)
+    WORLD.cluster(:data).rm(names, opts)
   end.enhance{ Rake::Task[:info].invoke }
 
   desc "Open a shell on a machine that mounts all volumes in the data cluster"
   task :inspector do
     inspector = Rucker::Container.new(:data_inspector, 'bd4c/hadoop_base',
-      volumes_from: LAYOUT.cluster(:data).container_names,
+      volumes_from: WORLD.cluster(:data).container_names,
       entrypoint: '/bin/bash')
     inspector.run(interactive: true)
   end
@@ -117,7 +114,7 @@ namespace :data do
   task_args :snapshot, :container do |names|
     tag   = TAG || 'snapshot'
     names = names || ENV['CONTAINER']
-    containers = LAYOUT.cluster(:data).containers_slice(names || 'all')
+    containers = WORLD.cluster(:data).containers_slice(names || 'all')
     show_output = ENV['show_output'].present? || ENV['SHOW_OUTPUT'].present?
     containers.each do |ctr|
       Rucker.banner("Existing images before incremental for #{ctr.image_name}")
@@ -143,7 +140,7 @@ namespace :data do
   task_args :archive, :container do |names|
     tag   = TAG || 'archived'
     names = names || ENV['CONTAINER']
-    containers = LAYOUT.cluster(:data).containers_slice(names || 'all')
+    containers = WORLD.cluster(:data).containers_slice(names || 'all')
     show_output = ENV['show_output'].present? || ENV['SHOW_OUTPUT'].present?
     #
     containers.each do |ctr|
@@ -171,7 +168,7 @@ namespace :data do
       #
       if show_output
         Rucker.banner("History:")
-        Rucker::Image.dump_history(dest_image_name)
+        Rucker::Actual::Image.dump_history(dest_image_name)
       end
       #
 
@@ -182,6 +179,32 @@ namespace :data do
 
 end
 
+namespace :world do
+  desc "Restores the cluster to running from an established good state"
+  task :enable do
+    actual_world = Rucker::Actual::World.new(WORLD)
+    actual_world.refresh!
+    # actual_world.containers
+    puts Rucker::Actual::Image.images_table(actual_world.images).join("\n")
+  end
+
+  desc "Starts the cluster from a known good state; it must have already been run"
+  task :disable do
+
+  end
+  desc "Obliterates the cluster by stopping and removing all containers and their volumes."
+  task :nuke_from_orbit do
+    Rake::Task['ps'               ].invoke
+    Rake::Task['hadoop:stop'      ].invoke('all')
+    Rake::Task['hadoop:rm'        ].invoke('all')
+    WORLD.cluster(:data).stop('all', ignore_errors: true)
+    Rake::Task['data:delete_data' ].invoke('all')    
+    Rake::Task['helpers:stop'     ].invoke('all')
+    Rake::Task['helpers:rm'       ].invoke('all')
+    Rake::Task['info'             ].execute
+  end
+end
+
 
 namespace :images do
   def tagged_image(name)
@@ -190,7 +213,7 @@ namespace :images do
 
   desc "Pull all images from the docker hub. Takes a while. Supply a TAG=name env var to get only corresponding bd4c images"
   task :pull do
-    our_images = LAYOUT.image_names.map{|img_name| tagged_image(img_name) }
+    our_images = WORLD.image_names.map{|img_name| tagged_image(img_name) }
     (EXTERNAL_IMAGES + our_images).each do |img_name|
       Rucker.banner("Pull #{img_name} -- this can take a stupidly long time")
       sh("docker pull #{img_name}")
@@ -201,7 +224,7 @@ namespace :images do
   task :tag, :name, :image do |tt, opts|
     tag_name   = Rucker.expect_one('tag', opts[:name])
     image_name = Rucker.expect_some('image', opts[:image])
-    images = (image_name == 'all' ? LAYOUT.image_names : [images])
+    images = (image_name == 'all' ? WORLD.image_names : [images])
     images.each do |img_name|
       sh "docker tag #{img_name} #{img_name}:#{tag}"
     end
@@ -210,7 +233,7 @@ namespace :images do
   task :push do
     tag = Rucker.expect_one(:tag, TAG || 'latest')
     puts "Pushing imags prefixed with $DOCKER_ORG=#{DOCKER_ORG} -- this can take a stupidly long time, and you have to be part of the #{DOCKER_ORG} org for it to work."
-    LAYOUT.image_names.each do |img_name|
+    WORLD.image_names.each do |img_name|
       next unless img_name =~ %r{#{DOCKER_ORG}/}
       img_name = "#{img_name}:#{tag}"
       Rucker.banner("Push #{img_name} -- this can take a stupidly long time")
@@ -220,16 +243,16 @@ namespace :images do
 
   desc "List images in a compact tab-separated form"
   task_args :ls, :img_names do |img_names|
-    Rucker::Image.dump_images(img_names.to_s)
+    Rucker::Actual::Image.dump_images(img_names.to_s)
   end
 
   desc "History of an image in a compact tab-separated for"
   task_args :history, :name do |img_name|
     img_name ||= Rucker.expect_one('image', IMAGE)
-    Rucker::Image.dump_history(img_name)
+    Rucker::Actual::Image.dump_history(img_name)
   end
 end
-task :images => 'images:list'
+task :images => 'images:ls'
 
 #
 # Utility tasks
@@ -244,6 +267,7 @@ task_args :sleep, :duration do |duration|
   sleep(duration, 1)
 end
 
+
 namespace :docker do
   # task :build do
   #   HADOOP_IMAGES.each do |img_name|
@@ -255,7 +279,7 @@ namespace :docker do
   desc "Show detailed information on a container"
   task_args :inspect, :container do |name|
     Rucker.expect_one('container', name)
-    container = LAYOUT.container(name)
+    container = WORLD.container(name)
     puts container.docker_inspect
   end
 

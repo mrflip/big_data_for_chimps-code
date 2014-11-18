@@ -18,7 +18,7 @@ module Rucker::RakeUtils
         opts[:detach] = true
       end
       block.call(names, opts)
-    end.enhance{ Rake::Task[:ps].invoke }
+    end.enhance{ Rake::Task[:ps].execute }
   end
 
 end
