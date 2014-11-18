@@ -1,10 +1,9 @@
-require 'pry'
 require 'yaml'
 require 'rake'
 require 'rake/file_utils.rb'
 require 'multi_json'
 require 'docker'
-require 'childprocess'
+require_relative 'docker/container_extensions'
 
 require 'gorillib'
 require 'gorillib/pathname'
@@ -54,12 +53,16 @@ require 'gorillib/model/positional_fields'
 require 'gorillib/model/serialization'
 
 require_relative 'rucker/keyed_collection'
+require_relative 'rucker/manifest/base'
+require_relative 'rucker/manifest/port_binding'
+require_relative 'rucker/manifest/image'
 require_relative 'rucker/models'
 require_relative 'rucker/runner'
-
 require_relative 'rucker/actual/base'
 require_relative 'rucker/actual/world'
 require_relative 'rucker/actual/discovery'
+require_relative 'rucker/formatter'
+require_relative 'rucker/formatter/table'
 require_relative 'rucker/formatter/table'
 
 module Rucker
@@ -72,7 +75,8 @@ module Rucker
   end
 
   def bytes_to_human(size)
-    HUMAN_TO_BYTES.each{|unit, mag| if size.abs > mag then return [size.to_f / mag, unit] ; end }
+    # since 1000-1024 waste 4 digits, and since most things are < 3 gb, roll units at 3072 not 1024
+    HUMAN_TO_BYTES.each{|unit, mag| if size.abs > (3 * mag) then return [size.to_f / mag, unit] ; end }
     return [size, 'B']
   end
   def bytes_to_magnitude(size) bytes_to_human(size)[0] ; end
@@ -99,4 +103,12 @@ module Rucker
     arg
   end
 
+
+  # Going through here lets us decide later whether to raise an error (i.e. used
+  # as a library) or abort (as now, used as a script, when a stack trace would
+  # be silly)
+  def die(msg)
+    msg += caller[0..1].join(" // ")
+    abort(msg)
+  end
 end

@@ -39,7 +39,7 @@ module Rucker
       @clxn       = Hash.new
       @item_type  = opts[:item_type] or raise(ArgumentError, "#{self.class} requires an :item_type prescribing the objects it holds")
       @belongs_to = opts[:belongs_to] if opts[:belongs_to].present?
-      receive!(opts[:values])         if opts[:values].present?
+      receive!(opts[:items])         if opts[:items].present?
     end
 
     # Adds an item in-place using the value of item.collection_key.  Items
@@ -81,15 +81,19 @@ module Rucker
     delegate :length, :size, :empty?, :blank?,        :to => :clxn
 
     # @return [Array] an array holding the items
-    def to_a    ; values    ; end
+    def to_a    ; clxn.values    ; end
     # @return [{Symbol => Object}] a hash of key=>item pairs
     def to_hash ; clxn.dup  ; end
 
-    # iterate over each value in the collection
+    # more stylish name
+    def items ; clxn.values ; end
+    
+    # iterate over each value in the collection, returning the list of items, as an array does
     def each(&blk); each_value(&blk) ; end
 
-    # iterate over each value in the collection
-    def map(*args, &blk) values.map(*args, &blk) ; end
+    # iterate over each value in the collection, returning the list of block results, as an array does
+    def map(*args, &blk) clxn.each_value.map(*args, &blk) ; end
+
 
     # Adds item, returning the collection itself.
     # @return [Gorillib::Collection] the collection
@@ -148,9 +152,9 @@ module Rucker
 
     # Create a new collection and add the given items to it
     # (if given an existing collection, just returns it directly)
-    def self.receive(values)
-      return values if native?(values)
-      coll = self.new(values)
+    def self.receive(items)
+      return items if native?(items)
+      coll = self.new(items)
       coll
     end
 

@@ -16,6 +16,7 @@ module Rucker
     def get_output(*args)
       opts = args.extract_options!
       args.map!(&:to_s)
+      require 'childprocess'
       out, err, status = Gorillib::System::Runner.run(args)
       if (status != 0) && (not opts[:ignore_errors])
         $stdout.write out

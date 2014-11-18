@@ -4,7 +4,6 @@ module Rucker
     class World
 
       def refresh!
-        refresh_containers!
         refresh_images!
       end
 
@@ -29,39 +28,12 @@ module Rucker
               name:       tagged_name,
               id:         info['id'],
               created_at: info['Created'],
-              parent_id:  info['ParentId'],
-              layer_size: info['Size'],
               size:       info['VirtualSize'],
               manifest:   image_manifest,
               docker_obj: docker_obj,
+              # parent_id:  info['ParentId'],
+              # layer_size: info['Size'],
             }
-          end
-        end.flatten.compact
-      end
-
-      #
-      # Containers
-      #
-
-      def refresh_containers!
-        raw_ctrs = fetch_raw_containers
-        binding.pry
-        receive_containers(raw_ctrs)
-      end
-
-      def fetch_raw_containers
-        docker_objs = Docker::Container.all('all' => 'True')
-        ctr_manifests = manifest.containers_hsh
-        #
-        docker_objs.map do |docker_obj|
-          docker_obj.names.map do |name|
-            ctr_manifest = ctr_manifests[name]
-            next unless ctr_manifest.present?
-            ctr_manifest.simple_container_hsh.merge(
-              name: name,
-              manifest: ctr_manifest,
-              docker_obj: docker_obj
-              )
           end
         end.flatten.compact
       end

@@ -12,8 +12,8 @@ module Rucker
       full = flds.include?(:full)
       str = "%-23s\t%-7s\t%-15s\t%-15s\t%-23s" % [
         name, state, ip_address, hostname, image_name ]
-      str << "\t%-12s" % image_id                          if flds.include?(:image_id)
-      str << "\t%-64s" % full_image_id                     if flds.include?(:full_image_id)
+      str << "\t%-12s" % image_id                              if flds.include?(:image_id)
+      str << "\t%-64s" % full_image_id                         if flds.include?(:full_image_id)
       str << "\t%-23s" % dump_arr(real_volumes, 23, full)      if flds.include?(:volumes)
       str << "\t%-23s" % dump_arr(all_volumes, 23, true)       if flds.include?(:all_volumes)
       str << "\t%-23s" % dump_arr(real_volumes_from, 23, full) if flds.include?(:volumes_from)
@@ -45,8 +45,8 @@ module Rucker
       ctrs.each do |ctr|
         puts ctr.dump(*flds)
       end
-      clusters.each{|cl| puts cl.desc_state }
-      puts desc_state
+      clusters.each{|cl| puts "#{cl.type_name} #{cl.name} is #{cl.state_desc}" }
+      puts "#{type_name} #{name} is #{state_desc}"
       self
     end
 
@@ -55,7 +55,7 @@ module Rucker
   module Actual
 
     Image.class_eval do
-      PRINTF_FORMAT = %w[%-15s %-15s %-7s %14d %7.2f\ %2s %10s %-23s %-31s %s].join("\t")
+      PRINTF_FORMAT = %w[%-15s %-15s %-7s %14d %7.1f\ %2s %10s %-23s %-31s %s].join("\t")
       HEADER_FORMAT = %w[%-15s %-15s %-7s %14s   %7s\ %2s %10s %-23s %-31s %s].join("\t") %
         %w[namespace  slug  tag  size  human \  short_id ago name short_cmd]
 

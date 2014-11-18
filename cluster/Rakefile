@@ -185,8 +185,26 @@ namespace :world do
     actual_world = Rucker::Actual::World.new(WORLD)
     actual_world.refresh!
     # actual_world.containers
-    puts Rucker::Actual::Image.images_table(actual_world.images).join("\n")
+    # puts Rucker::Actual::Image.images_table(actual_world.images).join("\n")
+    binding.pry
   end
+
+  task :adventure do
+    actual_world = Rucker::Actual::World.new(WORLD)
+    actual_world.refresh!
+    require 'pry'
+    Pry::Helpers::Text.instance_eval do
+      Rucker.banner('Adventure')
+      puts ""
+      puts "  You are in a #{bright_cyan('dockyard')} of some kind."
+      puts "  A stern-looking stevedore hefts a gaff, and seagulls wheel overhead."
+      puts "  Paths lead #{bright_red('up')} and #{bright_red('down')}"
+      puts "  It is dark. #{bright_black('You are likely to be eaten by a grue.')}" if true or actual_world.absent? 
+    end
+    puts ""
+    binding.pry
+  end
+  
 
   desc "Starts the cluster from a known good state; it must have already been run"
   task :disable do

@@ -13,10 +13,14 @@ module Rucker
 
       def to_wire(options={})
         compact_attributes.merge(:_type => self.class.typename).inject({}) do |acc, (key,attr)|
-          next if skip_serialization_of.include?(key)
+          next(acc) if skip_serialization_of.include?(key)
           acc[key] = attr.respond_to?(:to_wire) ? attr.to_wire(options) : attr
           acc
         end
+      end
+
+      def type_name
+        Gorillib::Inflector.demodulize(self.class.name.to_s)
       end
 
     end
