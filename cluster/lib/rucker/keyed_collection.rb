@@ -94,7 +94,6 @@ module Rucker
     # iterate over each value in the collection, returning the list of block results, as an array does
     def map(*args, &blk) clxn.each_value.map(*args, &blk) ; end
 
-
     # Adds item, returning the collection itself.
     # @return [Gorillib::Collection] the collection
     def <<(item)
@@ -191,7 +190,7 @@ module Rucker
     end
 
     def inspect_compact
-      ["c{ ", keys.join(", "), ' }'].join
+      ["c{ ", keys.count, ' }'].join
     end
   end
 

@@ -30,23 +30,26 @@ echo "Assuming namenode has started... `date`"
 # shenanigans twice
 #
 sudo -u hdfs hadoop fs -mkdir -p                          \
-  /tmp                                                    \
+  /tmp  /tmp/mapred/system                                \
   /user/root /user/chimpy                                 \
   $HADOOP_LOG_DIR/yarn-apps                               \
   $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate \
+  /var/lib/hadoop-hdfs/cache/mapred/mapred/staging        \
   /user/hive/warehouse
 
 sudo -u hdfs hadoop fs -chmod -R 1777 \
-  /tmp                                \
+  /tmp /tmp/mapred/system             \
   /user/hive/warehouse                \
-  $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate 
+  $HADOOP_BULK_DIR/yarn-staging/history/done_intermediate \
+  /var/lib/hadoop-hdfs/cache/mapred/mapred/staging
 sudo -u hdfs hadoop fs -chmod    1777     $HADOOP_BULK_DIR/yarn-staging # not -R
  
 sudo -u hdfs hadoop fs -chown root        /user/root
 sudo -u hdfs hadoop fs -chown chimpy      /user/chimpy
 sudo -u hdfs hadoop fs -chown yarn:mapred $HADOOP_LOG_DIR/yarn-apps
-sudo -u hdfs hadoop fs -chown -R mapred   $HADOOP_BULK_DIR/yarn-staging
+sudo -u hdfs hadoop fs -chown -R mapred:hadoop \
+  $HADOOP_BULK_DIR/yarn-staging     \
+  /var/lib/hadoop-hdfs/cache/mapred \
+  /tmp/mapred/system
 
 sudo -u hdfs hadoop fs -ls -R /
-
-

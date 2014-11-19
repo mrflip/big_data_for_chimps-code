@@ -21,6 +21,7 @@ ENV ZK_LOG_DIR       $ZK_BULK_DIR/log
 
 ENV HADOOP_NN_HOSTNAME nn
 ENV HADOOP_RM_HOSTNAME rm
+ENV HADOOP_JT_HOSTNAME jt
 
 # Hadoop config stored here, and linked as the standard /etc/hadoop/conf
 ENV HADOOP_CONF_DIR /etc/hadoop/conf.cluster

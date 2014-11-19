@@ -55,6 +55,7 @@ module Rucker
   module Actual
 
     Image.class_eval do
+
       PRINTF_FORMAT = %w[%-15s %-15s %-7s %14d %7.1f\ %2s %10s %-23s %-31s %s].join("\t")
       HEADER_FORMAT = %w[%-15s %-15s %-7s %14s   %7s\ %2s %10s %-23s %-31s %s].join("\t") %
         %w[namespace  slug  tag  size  human \  short_id ago name short_cmd]

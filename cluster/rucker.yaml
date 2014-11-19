@@ -1,12 +1,14 @@
 local:
 
   images:
-    # Community-accepted starting points we 
-    'library/debian:latest':      { 'external': true }
-    'radial/busyboxplus:latest':  { 'external': true }
-    'blalor/docker-hosts:latest': { 'external': true }
-    'phusion/baseimage:0.9.15':   { 'external': true }
-    'radial/busyboxplus:latest':  { 'external': true }
+    # Community-accepted starting points we
+    'library/debian:latest':           { 'external': true }
+    'radial/busyboxplus:latest':       { 'external': true }
+    'blalor/docker-hosts:latest':      { 'external': true }
+    'phusion/baseimage:0.9.15':        { 'external': true }
+    'radial/busyboxplus:latest':       { 'external': true }
+    'dockerfile/elasticsearch:latest': { 'external': true }
+    'library/tomcat:7-jre7':           { 'external': true }
     #
     'bd4c/baseimage:latest':      { }
     'bd4c/hadoop_base:latest':    { }
@@ -16,6 +18,7 @@ local:
     'bd4c/hadoop_snn:latest':     { }
     'bd4c/hadoop_worker:latest':  { }
     'bd4c/hadoop_lounge:latest':  { }
+    'bd4c/lipstick:latest':       { }
     #
     'bd4c/data_gold:latest':      { 'kind': 'data' }
     'bd4c/data_hdfs0:latest':     { 'kind': 'data' }
@@ -30,16 +33,43 @@ local:
 
     # ===========================================================================
     #
+    # Helper images
+    #
+    helpers:
+      host_filer:
+        doc:         "Manages /etc/hosts on all containers, allowing discovery"
+        image_name:  "blalor/docker-hosts:latest"
+        entry_args:  ["/srv/hosts"]
+        volumes:
+          - "/var/lib/docker/hosts:/srv/hosts"
+          - "/var/run/docker.sock:/var/run/docker.sock"
+        hostname:     "host-filer"
+
+      es:
+        doc:         "Elasticsearch server for Lipstick"
+        image_name:  "dockerfile/elasticsearch:latest"
+        hostname:    "es"
+        ports:       [ "9200", "9300" ]
+
+      # ls_svr:
+      #   doc:         "Lipstick backend server"
+      #   image_name:  "library/tomcat:7-jre7"
+      #   hostname:    "ls-srv"
+      #   ports:       [ "10722:9292" ]
+
+
+    # ===========================================================================
+    #
     # Data
     #
 
     data:
-      data_gold:   { volumes: ["/data/gold"],        entry_args: ["pushpull", "/data/gold"],        image_name: "bd4c/data_gold"  }
-      data_outd:   { volumes: ["/data/outd"],        entry_args: ["pushpull", "/data/outd"],        image_name: "bd4c/data_outd"  }
-      data_hue:    { volumes: ["/bulk/hadoop/hue"],  entry_args: ["pushpull", "/bulk/hadoop/hue"],  image_name: "bd4c/data_hue"   }
-      data_nn:     { volumes: ["/bulk/hadoop/name"], entry_args: ["pushpull", "/bulk/hadoop/name"], image_name: "bd4c/data_nn"    }
-      data_hdfs0:  { volumes: ["/bulk/hadoop/hdfs"], entry_args: ["pushpull", "/bulk/hadoop/hdfs"], image_name: "bd4c/data_hdfs0" }
-      home_chimpy: { volumes: ["/home/chimpy"],      entry_args: ["pushpull", "/home/chimpy"],      image_name: "bd4c/home_chimpy" }
+      data_gold:   { volumes: ["/data/gold:/data/gold"],        entry_args: ["pushpull", "/data/gold"],        image_name: "bd4c/data_gold", _type: "rucker.data_container"   }
+      data_outd:   { volumes: ["/data/outd:/data/outd"],        entry_args: ["pushpull", "/data/outd"],        image_name: "bd4c/data_outd", _type: "rucker.data_container"   }
+      data_hue:    { volumes: ["/bulk/hadoop/hue:/bulk/hadoop/hue"],  entry_args: ["pushpull", "/bulk/hadoop/hue"],  image_name: "bd4c/data_hue", _type: "rucker.data_container"    }
+      data_nn:     { volumes: ["/bulk/hadoop/name:/bulk/hadoop/name"], entry_args: ["pushpull", "/bulk/hadoop/name"], image_name: "bd4c/data_nn", _type: "rucker.data_container"     }
+      data_hdfs0:  { volumes: ["/bulk/hadoop/hdfs:/bulk/hadoop/hdfs"], entry_args: ["pushpull", "/bulk/hadoop/hdfs"], image_name: "bd4c/data_hdfs0", _type: "rucker.data_container"  }
+      home_chimpy: { volumes: ["/home/chimpy:/home/chimpy"],      entry_args: ["pushpull", "/home/chimpy"],      image_name: "bd4c/home_chimpy", _type: "rucker.data_container" }
 
     # ===========================================================================
     #
@@ -48,7 +78,17 @@ local:
     # Remember that these must be in order you want them started
     #
     hadoop:
-      - name:         hadoop_nn
+
+      lipstick:
+        doc:         "Lipstick server for pig jobs pretty"
+        image_name:  "bd4c/lipstick:latest"
+        hostname:    "lipstick"
+        ports:       [ "10001:9292" ]
+        links:       [ "es:es" ]
+        volumes_from:
+          - home_chimpy
+
+      hadoop_nn:
         image_name:   "bd4c/hadoop_nn"
         hostname:     "nn"
         # console http 50070; ipc 8020
@@ -60,7 +100,7 @@ local:
           - "/var/lib/docker/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
-      - name:         hadoop_snn
+      hadoop_snn:
         image_name:   "bd4c/hadoop_snn"
         hostname:     "snn"
         # checkpoint api http 50090
@@ -71,7 +111,7 @@ local:
           - "/var/lib/docker/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
-      - name:         hadoop_rm
+      hadoop_rm:
         image_name:   "bd4c/hadoop_rm"
         hostname:     "rm"
         # rsrc mgr: console http 8088; scheduler 8030; tracker 8031; ipc 8032; admin 8033, shuffle 13562;
@@ -83,19 +123,31 @@ local:
           - "/var/lib/docker/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
+      # hadoop_jt:
+      #   image_name:   "bd4c/hadoop_jt"
+      #   hostname:     "jt"
+      #   # 
+      #   ports:         [ "9222:22", "50030:50030", "8021:8021", "9290:9290" ]
+      #   links:
+      #     - "hadoop_nn:nn"
+      #   volumes:
+      #     - "/var/lib/docker/hosts:/etc/hosts:ro"
+      #     - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
+
       #
       # TODO: We have hardcoded port mappings to the docker host, which is
       # convenient. It also however forces us to have a one-worker-only cluster.
       # Make it be one hero worker and a pool of 0..n anonymous workers (or just a
       # sea of anonymous workers)
       #
-      - name:         hadoop_worker00
+      hadoop_worker00:
         image_name:   "bd4c/hadoop_worker"
         # node mgr:  console http 8042, localizer 8040, ipc 8041
         # data node: console http 50075, ipc 50020, xceiver 50010
-        ports:         [ "9122:22", "8042:8042", "50075:50075", 8040, 8041, 50020, 50010 ]
+        ports:         [ "9122:22", "8042:8042", "50075:50075", "50060:50060", 8040, 8041, 50020, 50010 ]
         links:
           - "hadoop_nn:nn"
+          # - "hadoop_jt:jt"
           - "hadoop_rm:rm"
         volumes:
           - "/var/lib/docker/hosts:/etc/hosts:ro"
@@ -107,7 +159,7 @@ local:
       #
       # Running hue on the lounge so that there's only one URL users need to learn.
       #
-      - name:         hadoop_lounge
+      hadoop_lounge:
         image_name:   "bd4c/hadoop_lounge"
         hostname:     "lounge"
         ports:         [ "9022:22", "9001:9001" ]
@@ -120,20 +172,10 @@ local:
           - "data_hue"
         links:
           - "hadoop_nn:nn"
+          # - "hadoop_jt:jt"
           - "hadoop_rm:rm"
           - "hadoop_worker00:worker00"
-
-      #
-      # Helper images
-      #
-    helpers:
-      - name:        host_filer
-        image_name:  "blalor/docker-hosts"
-        entry_args:  ["/srv/hosts"]
-        volumes:
-          - "/var/lib/docker/hosts:/srv/hosts"
-          - "/var/run/docker.sock:/var/run/docker.sock"
-        hostname:     "host-filer"
+          - "lipstick:lipstick"
 
     # # ===========================================================================
     # #

@@ -7,7 +7,7 @@ include Rucker::RakeUtils
 Pathname.register_paths({
     cluster_layout: './rucker.yaml'
   })
-WORLD = Rucker::World.load('local')
+WORLD = Rucker::World.load(Pathname.of(:cluster_layout), 'local')
 
 IMAGE      = ENV['img'] || ENV['image']
 TAG        = ENV['tag']
@@ -196,13 +196,14 @@ namespace :world do
     Pry::Helpers::Text.instance_eval do
       Rucker.banner('Adventure')
       puts ""
-      puts "  You are in a #{bright_cyan('dockyard')} of some kind."
-      puts "  A stern-looking stevedore hefts a gaff, and seagulls wheel overhead."
+      puts "  You are in a dockyard of some kind."
+      puts "  A stern-looking stevedore stands before #{bright_cyan("#{WORLD.clusters.items.count} clusters")} hefting a gaff."
+      puts "  A seedy-looking grifter leans agains a photo booth labelled #{bright_cyan("#{WORLD.images.items.count} images")}, picking her teeth with a stiletto."
       puts "  Paths lead #{bright_red('up')} and #{bright_red('down')}"
       puts "  It is dark. #{bright_black('You are likely to be eaten by a grue.')}" if true or actual_world.absent? 
     end
     puts ""
-    binding.pry
+    WORLD.pry
   end
   
 

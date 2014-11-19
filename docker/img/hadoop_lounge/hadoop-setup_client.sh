@@ -23,3 +23,4 @@ $safe_apt_install hive
 $safe_apt_install python-mrjob
 $safe_apt_install oozie-client  
 $safe_apt_install hive-hcatalog hive-webhcat hive-webhcat-server
+

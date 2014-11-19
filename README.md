@@ -207,12 +207,20 @@ cd book/code/
 hadoop fs -mkdir -p /data/gold/geo/ufo_sightings
 hadoop fs -put      /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2 /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2
   # Run, pig, run!
-pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
+cd ~/book/code ; . /etc/default/hadoop ; . /etc/default/hadoop-0.20 ; pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
   # See the output:
 hadoop fs -cat /data/outd/ufos/sightings_hist/\* > /tmp/sightings_hist.tsv
   # Whadday know, they're the same!
 colordiff -uw /data/outd/ufos/sightings_hist-reference.tsv /tmp/sightings_hist.tsv && echo 'No diffference'
 ```
+
+```
+cd ~/book/code ;
+bzcat /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2 | hadoop fs -put - /data/gold/geo/ufo_sightings/ufo_sightings.tsv
+. /etc/default/hadoop ; . /etc/default/hadoop-0.20 ;
+pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
+```
+
 
 Locally!
 

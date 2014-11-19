@@ -87,37 +87,48 @@ module Docker
     # These things come back for free with the call to .all
     #
 
-    def self.create_from_manifest(ctr)
+    def self.raw_create_hsh(ctr)
       pub_ports = ctr.ports.published_creation_hshs
       exp_ports = ctr.ports.exposed_creation_hshs
-      create({
+      vol_spec = {}
+      ctr.volumes.each{|vol| vol_spec[vol.gsub(/:.*/,'')] = Hash.new }
+      {
         'name'              => ctr.name,
         'Image'             => ctr.image_name,
         'Entrypoint'        => ctr.entrypoint,
         'Cmd'               => ctr.entry_args,
         'Hostname'          => ctr.hostname,
+        'Volumes'           => vol_spec,
         'HostConfig' =>{
           'Links'           => ctr.links.map(&:to_s), # 'container_name:alias'
           'Binds'           => ctr.volumes,           # 'path', 'hpath:cpath', 'hpath:cpath:ro'
           'VolumesFrom'     => ctr.volumes_from,      # ctr_name:ro or ctr_name:rw
-          'RestartPolicy'   => {'Name'=>'always'},    # or { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
+          'RestartPolicy'   => {},                    # or {'Name'=>'always'} or { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
           'ExposedPorts'    => exp_ports,             # { "<port>/<tcp|udp>: {}" }
           'PortBindings'    => pub_ports,             # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
           'PublishAllPorts' => true,
         }
-      })
+      }
     end
 
-    def start_from_manifest(ctr)
+    def self.create_from_manifest(ctr)
+      create(raw_create_hsh(ctr))
+    end
+
+    def raw_start_hsh(ctr)
       pub_ports = ctr.ports.published_creation_hshs
-      start({
+      {
         'Links'           => ctr.links.map(&:to_s),   # 'container_name:alias'
         'Binds'           => ctr.volumes,             # 'path', 'hpath:cpath', 'hpath:cpath:ro'
         'VolumesFrom'     => ctr.volumes_from,        # ctr_name:ro or ctr_name:rw
         'RestartPolicy'   => {'Name'=>'always'},      # or { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
         'PortBindings'    => pub_ports,               # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
         'PublishAllPorts' => true,
-      })
+      }
+    end
+
+    def start_from_manifest(ctr)
+      start(raw_start_hsh(ctr))
     end
 
     def stop_from_manifest(ctr)
@@ -171,6 +182,8 @@ module Docker
     # Memoized request for detailed values
     def ext_info
       @ext_info  ||= json
+    rescue Docker::Error::DockerError => err
+      @ext_info = { 'NetworkSettings' => {}, 'Config' => {}, 'HostConfig' => {}, 'State' => {} }
     end
 
     def hostname()        ext_info['Hostname'] ;  end
@@ -197,6 +210,7 @@ module Docker
     def state()
       state_hsh = ext_info['State']
       case
+      when state_hsh.blank?        then :absent
       when state_hsh['Running']    then :running
       when state_hsh['Restarting'] then :restart
       when state_hsh['Paused']     then :paused
@@ -214,7 +228,7 @@ module Docker
 
     def ports_from_ext
       pbs = []
-      bound_ports = ext_info['HostConfig']['PortBindings']
+      bound_ports = ext_info['HostConfig']['PortBindings'] or return []
       bound_ports.each do |key, bindings|
         cport, proto = key.split('/');
         bindings.each do |info|

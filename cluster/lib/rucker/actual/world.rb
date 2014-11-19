@@ -39,6 +39,7 @@ module Rucker
     end
 
     class Image < Rucker::Actual::Base
+      include Gorillib::Model::PositionalFields
       include Rucker::Common::Image
       #
       field :name,        :string,  doc: "Full name -- ns/slug:tag -- for image"

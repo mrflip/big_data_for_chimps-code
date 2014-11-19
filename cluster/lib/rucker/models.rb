@@ -15,29 +15,55 @@ module Rucker
     field :entry_args,   :array, of: :string, default: ->{ [] }
     #
     collection :ports,   Rucker::PortBindingCollection, item_type: PortBinding
-    field :docker_obj,   Whatever
+    #
+    attr_accessor :docker_obj
+    class_attribute :max_retries; self.max_retries = 10
+
+    def receive!(val)
+      if val.respond_to?(:delete)
+        @docker_obj = val.delete(:docker_obj)
+      end
+      super(val)
+    rescue
+      super(val)
+    end
 
     def state
       return :absent if self.docker_obj.blank?
       docker_obj.state
     end
 
+    def exit_code
+      return -999 if self.docker_obj.blank?
+      docker_obj..exit_code
+    end
+
     #
     # Orchestration movements
     #
 
-    def ready
-      case state
-      when :running then              return true
-      when :paused  then              return true
-      when :stopped then              return true
-      when :restart then              return false # wait for restart
-      when :absent  then _create  ;   return false # wait for create
-      else return false # don't know, hope we figure it out.
+    def invoke_until_satisfied(operation, *args)
+      forget
+      max_retries.times do |idx|
+        begin
+          Rucker.progress("#{operation} -> #{desc} (#{state_desc}) #{idx > 1 ? " (#{idx})" : ''}")
+          success = self.public_send("_#{operation}", *args)
+          return true if success
+        rescue Docker::Error::DockerError => err
+          warn "Problem with #{operation} -> #{name}: #{err}"
+        end
+        sleep 2
+        forget
       end
+      Rucker.die "Could not bring #{self.inspect_compact} to #{operation} after #{max_retries} attempts. Dying."
     end
 
-    def up
+    def up(*args)    invoke_until_satisfied(:up,    *args) ; end
+    def ready(*args) invoke_until_satisfied(:ready, *args) ; end
+    def down(*args)  invoke_until_satisfied(:down,  *args) ; end
+    def clear(*args) invoke_until_satisfied(:clear, *args) ; end
+
+    def _up
       case state
       when :running then              return true
       when :paused  then _unpause ;   return false # wait for unpause
@@ -48,7 +74,18 @@ module Rucker
       end
     end
 
-    def down
+    def _ready
+      case state
+      when :running then              return true
+      when :paused  then              return true
+      when :stopped then              return true
+      when :restart then              return false # wait for restart
+      when :absent  then _create  ;   return false # wait for create
+      else return false # don't know, hope we figure it out.
+      end
+    end
+
+    def _down
       case state
       when :running then _stop   ;    return false # wait for stop
       when :paused  then _stop   ;    return false # wait for stop
@@ -59,7 +96,7 @@ module Rucker
       end
     end
 
-    def clear
+    def _clear
       case state
       when :running then down ;       return false # wait for down
       when :paused  then down ;       return false # wait for down
@@ -77,48 +114,48 @@ module Rucker
     # Creates a container rfomr the specified image and prepares it for
     # running the specified command. You can then start it at any point.
     def _create
-      Rucker.progress("  Creating #{type_name} #{name}")
+      Rucker.progress("  Creating #{desc}")
       self.docker_obj = Docker::Container.create_from_manifest(self)
       forget() ; self
     end
 
     # Start a created container
     def _start
-      Rucker.progress("  Starting #{type_name} #{name}")
+      Rucker.progress("  Starting #{desc}")
       docker_obj.start_from_manifest(self)
       forget() ; self
     end
 
     # Stop a running container by sending `SIGTERM` and then `SIGKILL` after a grace period
     def _stop
-      Rucker.progress("  Stopping #{type_name} #{name}")
+      Rucker.progress("  Stopping #{desc}")
       docker_obj.stop_from_manifest(self)
       forget() ; self
     end
 
     # Remove a container completely.
     def _remove
-      Rucker.progress("  Removing #{type_name} #{name}")
+      Rucker.progress("  Removing #{desc}")
       docker_obj.remove('v' => 'true')
       forget() ; self
     end
 
     # Pause all processes within a container. The docker pause command uses the cgroups freezer to suspend all processes in a container. Traditionally when suspending a process the SIGSTOP signal is used, which is observable by the process being suspended. With the cgroups freezer the process is unaware, and unable to capture, that it is being suspended, and subsequently resumed.
     def _pause()
-      Rucker.progress("  Pausing #{type_name} #{name}")
+      Rucker.progress("  Pausing #{desc}")
       docker_obj.pause()
       forget() ; self
     end
     # The docker unpause command uses the cgroups freezer to un-suspend all processes in a container.
     def _unpause()
-      Rucker.progress("  Unpausing #{type_name} #{name}")
+      Rucker.progress("  Unpausing #{desc}")
       docker_obj.pause()
       forget() ; self
     end
 
     # Display the running processes of a container. Options are passed along to PS.
     def top(opts={})
-      Rucker.progress("  Showing #{type_name} #{name}'s top processes")
+      Rucker.progress("  Showing #{desc}'s top processes")
       Rucker.output( docker_obj.top(opts) )
     end
 
@@ -133,17 +170,30 @@ module Rucker
     def set_collection_key(key) receive_name(key) ; end
   end
 
+  class DataContainer < Container
+    # def _up
+    #   return true if exit_code == 0 # all that matters is that it was started once
+    #   super
+    # end
+  end
+
   class ContainerCollection < Rucker::KeyedCollection
     include Rucker::Common
-    MAX_RETRIES = 10
+    class_attribute :max_retries; self.max_retries = 10
 
-    def invoke_until_satisfied(operation)
-      MAX_RETRIES.times do |idx|
-        Rucker.progress("Group is #{state_desc}")
+    def desc
+      str = (item_type.try(:type_name) || 'Item')+'s'
+      str << ' in ' << belongs_to.desc if belongs_to.respond_to?(:desc)
+      str
+    end
+
+    def invoke_until_satisfied(operation, *args)
+      max_retries.times do |idx|
         Rucker.progress("#{operation} -> #{length} #{item_type.type_name}#{idx > 1 ? " (#{idx})" : ''}")
+        Rucker.progress("  #{desc} are #{state_desc}")
         successes = items.map do |ctr|
           begin
-            ctr.public_send operation
+            ctr.public_send(:"_#{operation}", *args)
           rescue Docker::Error::DockerError => err
             warn "Problem with #{operation} -> #{ctr.name}: #{err}"
             sleep 1
@@ -153,15 +203,20 @@ module Rucker
         sleep 1.5
         refresh!
       end
-      Rucker.die "Could not bring #{self.inspect_compact} to #{operation} after #{MAX_RETRIES} attempts. Dying."
+      Rucker.die "Could not bring #{self.inspect_compact} to #{operation} after #{max_retries} attempts. Dying."
     end
+
+    def up(*args)    invoke_until_satisfied(:up,    *args) ; end
+    def ready(*args) invoke_until_satisfied(:ready, *args) ; end
+    def down(*args)  invoke_until_satisfied(:down,  *args) ; end
+    def clear(*args) invoke_until_satisfied(:clear, *args) ; end
 
     #
     # State managemet
     #
 
     def state
-      each_value.map(&:state).uniq.compact
+      map(&:state).uniq.compact
     end
     def running?() state == [:running] ; end
     def paused?()  state == [:paused]  ; end
@@ -172,15 +227,14 @@ module Rucker
 
     def refresh!
       # Reset all the containers and get a lookup table of containers
-      each{|ctr| ctr.forget ; ctr.unset_attribute(:docker_obj) }
+      each{|ctr| ctr.forget ; ctr.remove_instance_variable(:@docker_obj) if ctr.instance_variable_defined?(:@docker_obj) }
       #
       # Grab all the containers
       #
       ctr_names = keys.to_set
       Docker::Container.all('all' => 'True').map do |docker_obj|
-        # any of the names match a manifest?
+        # if any name matches a manifest, gift it; skip the docker_obj otherwised
         name = ctr_names.intersection(docker_obj.names).first or next
-        # great, gift the docker_obj to the manifest
         self[name].docker_obj = docker_obj
       end
       self
@@ -194,8 +248,12 @@ module Rucker
     #
     def container(name)   containers[name.to_sym] ; end
     def container_names() containers.keys ; end
-
     def image_names()     containers.map(&:image_name).uniq ;  end
+
+    def up(*args)    containers.up(*args)    ; end
+    def ready(*args) containers.ready(*args) ; end
+    def down(*args)  containers.down(*args)  ; end
+    def clear(*args) containers.clear(*args) ; end
 
     #
     # Info
@@ -238,28 +296,32 @@ module Rucker
     collection :clusters,  ClusterCollection, item_type: Rucker::Cluster
     collection :images,    ImageCollection,   item_type: Rucker::Image
 
-    def self.load(name)
-      layout = YAML.load_file Pathname.of(:cluster_layout)
+    # @return Rucker::Cluster the named cluster, or nil
+    def cluster(name)    clusters[name] ; end
+
+    # @return Rucker::Container the named container, or nil
+    def container(name)  clusters.map{|cl| cl.container(name) }.compact.first ; end
+
+    # Loads the chosen world from the layout yaml file
+    # @return Rucker::World
+    def self.load(layout_file, name)
+      layout = YAML.load_file layout_file
       world_layout = layout[name.to_s]
       world_layout['clusters'] = world_layout['clusters'].map{|cl_name, ctrs| { name: cl_name, containers: ctrs } }
+      world_layout['name'] = name
       receive(world_layout).refresh!
     end
 
     def refresh!
-      all_containers.refresh!
+      containers.refresh!
       self
     end
 
-    def image_names(cl_names='all')
-      clusters_slice(cl_names).map(&:image_names).flatten.uniq
-    end
+    def up(*args)    clusters.each{|cl| cl.up(*args) } ; end
+    def ready(*args) clusters.each{|cl| cl.ready(*args) } ; end
+    def down(*args)  clusters.items.reverse.each{|cl| cl.down(*args) } ; end
+    def clear(*args) clusters.items.reverse.each{|cl| cl.clear(*args) } ; end
 
-    #
-    #
-    #
-
-    def cluster(name) clusters.find{|cl| cl.name == name } ; end
-    #
     def clusters_slice(cl_names)
       return clusters if cl_names.to_s == 'all'
       Array.wrap(cl_names).map do |cl_name|
@@ -267,18 +329,15 @@ module Rucker
       end
     end
 
-    def all_containers
-      return @all_containers if instance_variable_defined?(:@all_containers)
-      @all_containers = Rucker::ContainerCollection.new(item_type: Rucker::Container)
+    def containers
+      return @containers if instance_variable_defined?(:@containers)
+      @containers = Rucker::ContainerCollection.new(belongs_to: self, item_type: Rucker::Container)
       clusters.each do |cl|
-        cl.containers.each{|cnt| @all_containers.add(cnt) }
+        cl.containers.each{|cnt| @containers.add(cnt) }
       end
-      @all_containers
+      @containers
     end
 
-    def container(name)
-      clusters.map{|cl| cl.container(name) }.compact.first
-    end
     #
     # @param names [String] names of containers to retrieve, or 'all' for all.
     # @return [Array[Rucker::Layour::Container]] requested containers across all clusters

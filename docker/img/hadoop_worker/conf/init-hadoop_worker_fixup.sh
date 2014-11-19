@@ -15,14 +15,15 @@ ls -l $HADOOP_BULK_DIR
 chown hdfs:hdfs     $HADOOP_BULK_DIR/hdfs
 chown mapred:hadoop $HADOOP_BULK_DIR/jobstatus $HADOOP_BULK_DIR/mapred
 chmod 775           $HADOOP_BULK_DIR/jobstatus $HADOOP_BULK_DIR/mapred
-chown yarn:yarn     $HADOOP_BULK_DIR/yarn-local
 
 # Machine must have a $HADOOP_LOG_DIR, but we'll make the log dirs for you
 [ -d $HADOOP_LOG_DIR/yarn-containers ] || mkdir $HADOOP_LOG_DIR/yarn-containers
 chown yarn:yarn     $HADOOP_LOG_DIR/yarn-containers
 
+mkdir -p            $HADOOP_BULK_DIR/yarn-local
+chown yarn:yarn     $HADOOP_BULK_DIR/yarn-local
 
-mkdir -p  $HADOOP_LOG_DIR/hadoop-hdfs  $HADOOP_LOG_DIR/hadoop-mapreduce  $HADOOP_LOG_DIR/hadoop-yarn
-chmod 775 $HADOOP_LOG_DIR/hadoop-hdfs  $HADOOP_LOG_DIR/hadoop-mapreduce 
+mkdir -p  $HADOOP_LOG_DIR/hadoop-hdfs  $HADOOP_LOG_DIR/hadoop-mapreduce  $HADOOP_LOG_DIR/hadoop-0.20-mapreduce $HADOOP_LOG_DIR/hadoop-yarn 
+chmod 775 $HADOOP_LOG_DIR/hadoop-hdfs  $HADOOP_LOG_DIR/hadoop-mapreduce  $HADOOP_LOG_DIR/hadoop-0.20-mapreduce
 chown yarn:hadoop  $HADOOP_LOG_DIR/hadoop-yarn
 chgrp      hadoop  $HADOOP_LOG_DIR/hadoop-hdfs $HADOOP_LOG_DIR/hadoop-mapreduce

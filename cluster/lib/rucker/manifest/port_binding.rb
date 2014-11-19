@@ -41,9 +41,9 @@ module Rucker
       db = '0.0.0.0'
       # Could I do this with one regexp? probably, but I wouldn't want to read the conditionals that would ensue
       case str.to_s
-      when CPORT_RE       then {                      cport: $1, proto: ($2|'tcp'), desc: $3 }
-      when HPORT_CPORT_RE then { bind: db, hport: $1, cport: $2, proto: ($3|'tcp'), desc: $4 }
-      when BIND_HC_RE     then { bind: $1, hport: $2, cport: $3, proto: ($4|'tcp'), desc: $5 }
+      when CPORT_RE       then {                      cport: $1, proto: ($2||'tcp'), desc: $3 }
+      when HPORT_CPORT_RE then { bind: db, hport: $1, cport: $2, proto: ($3||'tcp'), desc: $4 }
+      when BIND_HC_RE     then { bind: $1, hport: $2, cport: $3, proto: ($4||'tcp'), desc: $5 }
       else
         warn "Can't parse port description #{str}"
         return str
@@ -66,7 +66,7 @@ module Rucker
     def published_creation_hshs
       hsh = Hash.new{|h,v| h[v] = [] } # auto-vivify
       items.select{|port| port.published? }.each do |port|
-        hsh[port.cport_proto] << { 'HostPort' => port.hport.to_s }
+        hsh[port.cport_proto] << { 'HostIp' => port.bind, 'HostPort' => port.hport.to_s }
       end
       hsh
     end

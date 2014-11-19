@@ -11,46 +11,38 @@ require 'gorillib/hash/keys'
 require 'gorillib/array/wrap'
 require 'gorillib/enumerable/hashify'
 require 'gorillib/system/runner'
-#
-require 'gorillib/object/blank'
-require 'gorillib/object/try'
-require 'gorillib/object/try_dup'
-require 'gorillib/array/extract_options'
-require 'gorillib/hash/keys'
-require 'gorillib/hash/slice'
-require 'gorillib/string/inflector'
-require 'gorillib/exception/raisers'
-require 'gorillib/metaprogramming/concern'
-require 'gorillib/metaprogramming/class_attribute'
-#
-require 'gorillib/factories'
-# require 'gorillib/type/extended'
-require 'gorillib/model/named_schema'
-require 'gorillib/model/validate'
-require 'gorillib/model/errors'
-#
-require 'gorillib/model/base'
-require 'gorillib/model/schema_magic'
 
-module Gorillib
-  module Model
-    def extra_attributes
-      @_extra_attributes || {}
-    end
-    module ClassMethods
-      # @return [{Symbol => Gorillib::Model::Field}]
-      def fields
-        return @_fields if defined?(@_fields)
-        @_fields = ancestors.reverse.inject({}){|acc, ancestor| acc.merge!(ancestor.try(:_own_fields) || {}) }.merge(@_own_fields)
-      end
+require 'gorillib/object/try'
+class Object
+  def try(*a, &b)
+    if a.empty? && block_given?
+      yield self
+    elsif !a.empty? && !respond_to?(a.first, true)
+      nil
+    else
+      __send__(*a, &b)
     end
   end
 end
 
-require 'gorillib/model/field'
-require 'gorillib/model/defaults'
+require 'gorillib/model'
 require 'gorillib/model/positional_fields'
 require 'gorillib/model/serialization'
+
+Gorillib::Model::ClassMethods.module_eval do
+
+  def receive(attrs={}, &block)
+    return nil if attrs.nil?
+    return attrs if native?(attrs)
+    #
+    Gorillib::Model::Validate.hashlike!(attrs){ "attributes for #{self.inspect}" }
+    type = attrs.delete(:_type) || attrs.delete('_type')
+    klass = type.present? ? Gorillib::Factory(type) : self
+    warn "factory #{klass} is not a subcass of #{self} (factory determined by _type: #{type.inspect} in #{attrs.inspect})" unless klass <= self
+    #
+    klass.new(attrs, &block)
+  end
+end
 
 require_relative 'rucker/keyed_collection'
 require_relative 'rucker/manifest/base'
