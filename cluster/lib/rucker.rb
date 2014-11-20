@@ -8,7 +8,7 @@ require 'gorillib'
 require 'gorillib/pathname'
 require 'gorillib/hash/keys'
 require 'gorillib/array/wrap'
-require 'gorillib/enumerable/hashify'
+#require 'gorillib/enumerable/hashify'
 require 'gorillib/system/runner'
 
 require 'gorillib/object/blank'
