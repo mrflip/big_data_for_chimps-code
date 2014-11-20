@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Example MapReduce job: pig latinize words.
 """
 import sys, re
