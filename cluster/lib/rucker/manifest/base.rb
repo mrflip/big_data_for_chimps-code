@@ -20,8 +20,8 @@ module Rucker
       include Rucker::Common
       # include Gorillib::Model::PositionalFields
 
-      class_attribute :skip_serialization_of
-      self.skip_serialization_of = [:docker_obj].to_set
+      class_attribute :accessor_fields
+      self.accessor_fields = []
 
       def self.type_name
         Gorillib::Inflector.demodulize(name.to_s)
@@ -35,18 +35,20 @@ module Rucker
         "#{type_name} #{name}"
       end
 
+      def self.accessor_field(name, type=Whatever, opts={})
+        name = name.to_sym
+        attr_accessor name
+        self.accessor_fields += [name]
+      end
+
       def handle_extra_attributes(attrs)
+        accessor_fields.each do |fn|
+          instance_variable_set(:"@#{fn}", attrs.delete(fn)) if attrs.include?(fn)
+        end
         warn "Extra attributes: #{attrs.keys}" if attrs.present?
         super
       end
 
-      def to_wire(options={})
-        compact_attributes.merge(:_type => self.class.typename).inject({}) do |acc, (key,attr)|
-          next(acc) if skip_serialization_of.include?(key)
-          acc[key] = attr.respond_to?(:to_wire) ? attr.to_wire(options) : attr
-          acc
-        end
-      end
     end
 
   end

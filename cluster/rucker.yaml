@@ -3,6 +3,8 @@ local:
   images:
     # Community-accepted starting points we
     'library/debian:latest':           { 'external': true }
+    'library/debian:stable':           { 'external': true }
+    'library/debian:jessie':           { 'external': true }
     'radial/busyboxplus:latest':       { 'external': true }
     'blalor/docker-hosts:latest':      { 'external': true }
     'phusion/baseimage:0.9.15':        { 'external': true }
@@ -50,13 +52,6 @@ local:
         image_name:  "dockerfile/elasticsearch:latest"
         hostname:    "es"
         ports:       [ "9200", "9300" ]
-
-      # ls_svr:
-      #   doc:         "Lipstick backend server"
-      #   image_name:  "library/tomcat:7-jre7"
-      #   hostname:    "ls-srv"
-      #   ports:       [ "10722:9292" ]
-
 
     # ===========================================================================
     #
@@ -147,8 +142,8 @@ local:
         ports:         [ "9122:22", "8042:8042", "50075:50075", "50060:50060", 8040, 8041, 50020, 50010 ]
         links:
           - "hadoop_nn:nn"
-          # - "hadoop_jt:jt"
           - "hadoop_rm:rm"
+          # - "hadoop_jt:jt"
         volumes:
           - "/var/lib/docker/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
@@ -162,7 +157,7 @@ local:
       hadoop_lounge:
         image_name:   "bd4c/hadoop_lounge"
         hostname:     "lounge"
-        ports:         [ "9022:22", "9001:9001" ]
+        ports:         [ "9022:22", "10002:10002" ]
         volumes:
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
         volumes_from:
@@ -172,10 +167,10 @@ local:
           - "data_hue"
         links:
           - "hadoop_nn:nn"
-          # - "hadoop_jt:jt"
           - "hadoop_rm:rm"
-          - "hadoop_worker00:worker00"
           - "lipstick:lipstick"
+          - "hadoop_worker00:worker00"
+          # - "hadoop_jt:jt"
 
     # # ===========================================================================
     # #

@@ -6,6 +6,7 @@ gem 'pry',       "~> 0.10"
 
 gem 'multi_json', ">= 1.1"
 
-gem 'childprocess'
-
-gem 'docker-api', :require => 'docker'
+group :docker do
+  gem 'childprocess'
+  gem 'docker-api', :require => 'docker'
+end

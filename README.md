@@ -18,8 +18,6 @@ For the experienced and reckless, there's a compact summary version following th
 * /README.md -- walkthrough and summary
 * /notes/Troubleshooting.md -- detailed checks on each component
 
-
-
 ## Dockering I: Preliminaries
 
 ### Prerequisites
@@ -117,9 +115,9 @@ Don't proceed past this point until the `rake images:pull` has succeeded. Time f
 You're ready to proceed when:
 
 * Running `echo $DOCKER_HOST` from your terminal returns the address of your docker host
-* Running `rake ps` succeeds and shows no containers running.
+* Running `rake ps` succeeds and shows no containers in existence.
 * Running `rake images:pull` marches through the list fairly quickly, reporting in a bored tone that it already has everything.
-* For boot2docker users, `ls -l /var/lib/docker/hosts` on the docker host shows a file of zero size. For others, you have a 
+* For boot2docker users, `ls -l /var/lib/docker/hosts` on the docker host shows a file of zero size. (That, or `cat /var/lib/docker/hosts` shows a healthy-looking hosts file, in case you're unwinding back to this point from further on.)
 
 Alright! Now the fun starts.
 
@@ -166,7 +164,7 @@ Running `rake ps` will now show 12 containers: one helper, the five data contain
 
 #### Hue Web console.
 
-The friendly Hue console will be available at http://DOCKER_IP:9001/ in your browser (substitute the ip address of your docker). The login and password are 'chimpy' and 'chimpy'. (Ignore any whining it does about Oozie or Pig not working -- those are just front-end components we haven't installed)
+The friendly Hue console will be available at http://DOCKER_IP:9001/ in your browser (substitute the ip address of your docker). The login and password are 'chimpy' and 'chimpy'. Ignore any whining it does about Oozie or Pig not working -- those are just front-end components we haven't installed.
 
 * Visit the File Browser and drill down to http://$DOCKER_IP:9001/filebrowser/#/data/gold  You'll see all the different datasets we'll use. There's lots of fun stuff in there -- finishing the book will leave you ready to design your own investigations, and so we've provided lots of territory to explore.
 * Visit the Job Browser. Nothing going on yet, of course, but you'll be back here in a moment.
@@ -207,18 +205,12 @@ cd book/code/
 hadoop fs -mkdir -p /data/gold/geo/ufo_sightings
 hadoop fs -put      /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2 /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2
   # Run, pig, run!
-cd ~/book/code ; . /etc/default/hadoop ; . /etc/default/hadoop-0.20 ; pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
+hadoop fs -rm -r -f /data/outd/ufos/sightings_hist
+cd ~/book/code ; . /etc/default/hadoop ; pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
   # See the output:
 hadoop fs -cat /data/outd/ufos/sightings_hist/\* > /tmp/sightings_hist.tsv
   # Whadday know, they're the same!
 colordiff -uw /data/outd/ufos/sightings_hist-reference.tsv /tmp/sightings_hist.tsv && echo 'No diffference'
-```
-
-```
-cd ~/book/code ;
-bzcat /data/gold/geo/ufo_sightings/ufo_sightings.tsv.bz2 | hadoop fs -put - /data/gold/geo/ufo_sightings/ufo_sightings.tsv
-. /etc/default/hadoop ; . /etc/default/hadoop-0.20 ;
-pig -x mapred 04-intro_to_pig/a-ufo_visits_by_month.pig
 ```
 
 

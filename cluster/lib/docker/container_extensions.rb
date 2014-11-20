@@ -121,7 +121,7 @@ module Docker
         'Links'           => ctr.links.map(&:to_s),   # 'container_name:alias'
         'Binds'           => ctr.volumes,             # 'path', 'hpath:cpath', 'hpath:cpath:ro'
         'VolumesFrom'     => ctr.volumes_from,        # ctr_name:ro or ctr_name:rw
-        'RestartPolicy'   => {'Name'=>'always'},      # or { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
+        'RestartPolicy'   => {},                      # or {'Name'=>'always'} or  { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
         'PortBindings'    => pub_ports,               # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
         'PublishAllPorts' => true,
       }

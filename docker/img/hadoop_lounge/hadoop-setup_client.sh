@@ -16,9 +16,8 @@ chown hive:hive $HADOOP_LOG_DIR/hive-app
 $safe_apt_install hadoop-client hadoop-doc zookeeper-bin
 # # hadoop-hdfs-nfs3
 
-# Oozie, Pig, Hive, Mr. Job
+# Hive, Oozie, Mr. Job
 #
-$safe_apt_install pig pig-udf-datafu
 $safe_apt_install hive
 $safe_apt_install python-mrjob
 $safe_apt_install oozie-client  

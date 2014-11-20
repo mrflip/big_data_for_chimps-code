@@ -118,12 +118,22 @@ module Rucker
       add(item)
     end
 
-    # @return items with the given keys, or all items for the special key `:all`
-    def slice(*keys)
-      if keys == [:_all]
-        self.to_a
+    def new_empty_collection
+      self.class.new(belongs_to: self.belongs_to, item_type: self.item_type)
+    end
+
+    # @return items with the given keys, or all items for the special key `:_all`
+    def slice(*sl_keys)
+      sl_keys = sl_keys.map(&:to_sym)
+      if sl_keys == [:_all]
+        self.dup
       else
-        keys.map{|key| clxn[key] }
+        new_coll = new_empty_collection
+        sl_keys.each do |key|
+          if not include?(key) then warn "Item #{key} is not found in #{self}" ; next ; end
+          new_coll.add(self[key])
+        end
+        return new_coll
       end
     end
 

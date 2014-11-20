@@ -24,37 +24,17 @@ RUN             /build/hadoop-setup_hue.sh
 
 RUN $safe_apt_install ant maven2
 
-# ENV PIG_VERSION 0.13
-# ENV PIG_HOME    /usr/local/pig
-# 
-# COPY img/hadoop_lounge/hadoop-setup_pig.sh  /build/
-# RUN             /build/hadoop-setup_pig.sh
-# 
-# ENV  LIPSTICK_DIR           /usr/local/lipstick
-# ENV  LIPSTICK_CONSOLE_LIBS  $LIPSTICK_DIR/lipstick-console/build/libs
-# 
-# COPY img/hadoop_lounge/hadoop-setup_pig.sh  /build/
-# RUN             /build/hadoop-setup_pig.sh
-# 
-# RUN \
-#   mvn org.apache.maven.plugins:maven-install-plugin:2.5:install-file \
-#     -Dfile=build/pig-0.13.1-SNAPSHOT.jar \
-#     -DgroupId=org.apache.pig \
-#     -DartifactId=pig \
-#     -Dversion=0.13.0-h2 \
-#     -Dpackaging=jar
-# 
-# 
-# # That, but for hadoop    
-# RUN \
-#   false && \
-#   mvn org.apache.maven.plugins:maven-install-plugin:2.5:install-file \
-#     -Dfile=build/pig-0.13.1-SNAPSHOT.jar \
-#     -DgroupId=org.apache.pig \
-#     -DartifactId=pig \
-#     -Dversion=0.13.0-h2 \
-#     -Dpackaging=jar
+ENV PIG_VERSION 0.13
+ENV PIG_HOME    /usr/local/pig
 
+COPY img/hadoop_lounge/hadoop-setup_pig.sh  /build/
+RUN             /build/hadoop-setup_pig.sh
+
+ENV  LIPSTICK_DIR           /usr/local/lipstick
+ENV  LIPSTICK_CONSOLE_LIBS  $LIPSTICK_DIR/lipstick-console/build/libs
+
+COPY img/hadoop_lounge/hadoop-setup_lipstick.sh  /build/
+RUN             /build/hadoop-setup_lipstick.sh
 
 # Copy the hue config scripts and enable the servise
 #

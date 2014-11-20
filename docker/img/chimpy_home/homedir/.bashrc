@@ -136,4 +136,4 @@ ulimit -S -c 0
 export LC_ALL="en_US.UTF-8"
 export LANG="en_US.UTF-8"
 
-for file in hadoop hadoop-0.20 ; do if [ -f "/etc/default/$file" ] ; then . /etc/default/$file ; fi ; done
+if [ -f "/etc/default/hadoop" ] ; then . /etc/default/hadoop ; fi
