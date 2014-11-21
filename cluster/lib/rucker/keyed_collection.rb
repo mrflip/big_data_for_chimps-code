@@ -29,17 +29,18 @@ module Rucker
     attr_reader :clxn
     protected   :clxn
     # [Gorillib::Model] The model class that items instantiate
-    attr_reader :item_type
-    protected   :item_type
+    class_attribute :item_type, :instance_writer => false
+    protected       :item_type
 
     # Object that owns this collection
     attr_reader :belongs_to
 
     def initialize(opts={})
       @clxn       = Hash.new
-      @item_type  = opts[:item_type] or raise(ArgumentError, "#{self.class} requires an :item_type prescribing the objects it holds")
+      @item_type  = opts[:item_type]  if opts[:item_type].present?
+      item_type? or raise(ArgumentError, "#{self.class} requires an :item_type prescribing the objects it holds")
       @belongs_to = opts[:belongs_to] if opts[:belongs_to].present?
-      receive!(opts[:items])         if opts[:items].present?
+      receive!(opts[:items])          if opts[:items].present?
     end
 
     # Adds an item in-place using the value of item.collection_key.  Items
@@ -87,7 +88,7 @@ module Rucker
 
     # more stylish name
     def items ; clxn.values ; end
-    
+
     # iterate over each value in the collection, returning the list of items, as an array does
     def each(&blk); each_value(&blk) ; end
 
@@ -140,7 +141,7 @@ module Rucker
     #
     # Model Machinery
     #
-    
+
     # Receive items in-place, replacing any existing item with that key.
     #
     # Individual items are added using #receive_item -- if you'd like to perform
@@ -163,7 +164,7 @@ module Rucker
     # (if given an existing collection, just returns it directly)
     def self.receive(items)
       return items if native?(items)
-      coll = self.new(items)
+      coll = self.new(items: items)
       coll
     end
 
@@ -190,7 +191,7 @@ module Rucker
     def to_s
       to_a.to_s
     end
-    
+
     # @return [String] string describing the collection's array representation
     def inspect
       key_width = [keys.map{|key| key.to_s.length + 1 }.max.to_i, 45].min
@@ -202,24 +203,34 @@ module Rucker
     def inspect_compact
       ["c{ ", keys.count, ' }'].join
     end
-  end
 
-  #
-  # A keyed collection whose membership is expected to 
-  # remain unchanged after creation.
-  #
-  class FixedCollection < KeyedCollection
-    protected :add
-    protected :receive_item
-    protected :receive!
-    protected :delete
-    protected :<< ;
-    protected :[]= ;
-
-    def initialize(*args, &blk)
-      super
-      @clxn.freeze!
+    # @return [Array] serializable array representation of the collection
+    def to_wire(opts={})
+      map{|el| el.respond_to?(:to_wire) ? el.to_wire(opts) : el }
     end
+    # same as #to_wire
+    def as_json(*args) to_wire(*args) ; end
+    # @return [String] JSON serialization of the collection's array representation
+    def to_json(*args) to_wire(*args).to_json(*args) ; end
+
   end
-  
+
+  # #
+  # # A keyed collection whose membership is expected to
+  # # remain unchanged after creation.
+  # #
+  # class FixedCollection < Rucker::KeyedCollection
+  #   protected :add
+  #   protected :receive_item
+  #   protected :receive!
+  #   protected :delete
+  #   protected :<< ;
+  #   protected :[]= ;
+  #
+  #   def initialize(*args, &blk)
+  #     super
+  #     @clxn.freeze!
+  #   end
+  # end
+
 end

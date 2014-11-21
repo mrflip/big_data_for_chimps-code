@@ -8,7 +8,7 @@ module Rucker
       args.map!(&:to_s)
       Rake.sh(*args) do |ok, res|
         if (not ok) && (not opts[:ignore_errors])
-          abort("Command #{args.join(' ')} exited unsuccessfully (#{res.exitstatus})")
+          Rucker.die("Command #{args.join(' ')} exited unsuccessfully (#{res.exitstatus})")
         end
       end
     end
@@ -21,7 +21,7 @@ module Rucker
       if (status != 0) && (not opts[:ignore_errors])
         $stdout.write out
         $stderr.write err
-        abort("Command #{args.join(' ')} exited unsuccessfully (#{status}).")
+        Rucker.die("Command #{args.join(' ')} exited unsuccessfully (#{status}).")
       end
       [out, err, status]
     end

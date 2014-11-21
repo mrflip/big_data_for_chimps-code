@@ -2,15 +2,13 @@ local:
 
   images:
     # Community-accepted starting points we
-    'library/debian:latest':           { 'external': true }
-    'library/debian:stable':           { 'external': true }
-    'library/debian:jessie':           { 'external': true }
-    'radial/busyboxplus:latest':       { 'external': true }
-    'blalor/docker-hosts:latest':      { 'external': true }
-    'phusion/baseimage:0.9.15':        { 'external': true }
-    'radial/busyboxplus:latest':       { 'external': true }
-    'dockerfile/elasticsearch:latest': { 'external': true }
-    'library/tomcat:7-jre7':           { 'external': true }
+    'library/debian:stable':           { 'external': true, est_size: '154.7 MB' }
+    'library/java:7-jdk':              { 'external': true, est_size: '449.8 MB' }
+    'radial/busyboxplus:latest':       { 'external': true, est_size: '' }
+    'blalor/docker-hosts:latest':      { 'external': true, est_size: '' }
+    'phusion/baseimage:0.9.15':        { 'external': true, est_size: '' }
+    'radial/busyboxplus:latest':       { 'external': true, est_size: '' }
+    'dockerfile/elasticsearch:latest': { 'external': true, est_size: '' }
     #
     'bd4c/baseimage:latest':      { }
     'bd4c/hadoop_base:latest':    { }
@@ -29,7 +27,7 @@ local:
     'bd4c/data_outd:latest':      { 'kind': 'data' }
     'bd4c/home_chimpy:latest':    { 'kind': 'data' }
     'bd4c/home_chimpy:v0.01':     { 'kind': 'data' }
-
+    
   # clusters
   clusters:
 
@@ -51,7 +49,7 @@ local:
         doc:         "Elasticsearch server for Lipstick"
         image_name:  "dockerfile/elasticsearch:latest"
         hostname:    "es"
-        ports:       [ "9200", "9300" ]
+        ports:       [ "9200~api", "9300~transport" ]
 
     # ===========================================================================
     #
@@ -59,12 +57,12 @@ local:
     #
 
     data:
-      data_gold:   { volumes: ["/data/gold:/data/gold"],        entry_args: ["pushpull", "/data/gold"],        image_name: "bd4c/data_gold", _type: "rucker.data_container"   }
-      data_outd:   { volumes: ["/data/outd:/data/outd"],        entry_args: ["pushpull", "/data/outd"],        image_name: "bd4c/data_outd", _type: "rucker.data_container"   }
-      data_hue:    { volumes: ["/bulk/hadoop/hue:/bulk/hadoop/hue"],  entry_args: ["pushpull", "/bulk/hadoop/hue"],  image_name: "bd4c/data_hue", _type: "rucker.data_container"    }
-      data_nn:     { volumes: ["/bulk/hadoop/name:/bulk/hadoop/name"], entry_args: ["pushpull", "/bulk/hadoop/name"], image_name: "bd4c/data_nn", _type: "rucker.data_container"     }
-      data_hdfs0:  { volumes: ["/bulk/hadoop/hdfs:/bulk/hadoop/hdfs"], entry_args: ["pushpull", "/bulk/hadoop/hdfs"], image_name: "bd4c/data_hdfs0", _type: "rucker.data_container"  }
-      home_chimpy: { volumes: ["/home/chimpy:/home/chimpy"],      entry_args: ["pushpull", "/home/chimpy"],      image_name: "bd4c/home_chimpy", _type: "rucker.data_container" }
+      data_gold:   { volumes: ["/data/gold:/data/gold"],               entry_args: ["pushpull", "/data/gold"],        image_name: "bd4c/data_gold", _type: "rucker.manifest.data_container"   }
+      data_outd:   { volumes: ["/data/outd:/data/outd"],               entry_args: ["pushpull", "/data/outd"],        image_name: "bd4c/data_outd", _type: "rucker.manifest.data_container"   }
+      data_hue:    { volumes: ["/bulk/hadoop/hue:/bulk/hadoop/hue"],   entry_args: ["pushpull", "/bulk/hadoop/hue"],  image_name: "bd4c/data_hue", _type: "rucker.manifest.data_container"    }
+      data_nn:     { volumes: ["/bulk/hadoop/name:/bulk/hadoop/name"], entry_args: ["pushpull", "/bulk/hadoop/name"], image_name: "bd4c/data_nn", _type: "rucker.manifest.data_container"     }
+      data_hdfs0:  { volumes: ["/bulk/hadoop/hdfs:/bulk/hadoop/hdfs"], entry_args: ["pushpull", "/bulk/hadoop/hdfs"], image_name: "bd4c/data_hdfs0", _type: "rucker.manifest.data_container"  }
+      home_chimpy: { volumes: ["/home/chimpy:/home/chimpy"],           entry_args: ["pushpull", "/home/chimpy"],      image_name: "bd4c/home_chimpy", _type: "rucker.manifest.data_container" }
 
     # ===========================================================================
     #
@@ -78,7 +76,7 @@ local:
         doc:         "Lipstick server for pig jobs pretty"
         image_name:  "bd4c/lipstick:latest"
         hostname:    "lipstick"
-        ports:       [ "10001:9292" ]
+        ports:       [ "10001:9292~ui" ]
         links:       [ "es:es" ]
         volumes_from:
           - home_chimpy
@@ -87,7 +85,7 @@ local:
         image_name:   "bd4c/hadoop_nn"
         hostname:     "nn"
         # console http 50070; ipc 8020
-        ports:         [ "9422:22", "50070:50070", "8020:8020" ]
+        ports:         [ "9522:22~ssh", "50070:50070~view", "8020:8020~ipc" ]
         volumes_from:
           - data_nn
         volumes:
@@ -99,7 +97,7 @@ local:
         image_name:   "bd4c/hadoop_snn"
         hostname:     "snn"
         # checkpoint api http 50090
-        ports:         [ "9522:22", 50090 ]
+        ports:         [ "9422:22~ssh", "50090~ipc" ]
         links:
           - "hadoop_nn:nn"
         volumes:
@@ -111,7 +109,7 @@ local:
         hostname:     "rm"
         # rsrc mgr: console http 8088; scheduler 8030; tracker 8031; ipc 8032; admin 8033, shuffle 13562;
         # history:  console 19888 / https 19890, ipc 10020, admin 10033
-        ports:         [ "9322:22", "8088:8088", "8030:8030", "8031:8031", "8032:8032", "8033:8033", "13562:13562", "19888:19888", "10020:10020", "10033:10033" ]
+        ports:         [ "9322:22~ssh", "8088:8088~view", "8030:8030~sched", "8031:8031~tracker", "8032:8032~ipc", "8033:8033~yarnad", "13562:13562~shuffle", "19888:19888~histview", "10020:10020~ipc", "10033:10033~histad" ]
         links:
           - "hadoop_nn:nn"
         volumes:
@@ -122,7 +120,7 @@ local:
       #   image_name:   "bd4c/hadoop_jt"
       #   hostname:     "jt"
       #   # 
-      #   ports:         [ "9222:22", "50030:50030", "8021:8021", "9290:9290" ]
+      #   ports:         [ "9222:22~ssh", "50030:50030~view", "8021:8021~ipc", "9290:9290~thrift" ]
       #   links:
       #     - "hadoop_nn:nn"
       #   volumes:
@@ -130,16 +128,14 @@ local:
       #     - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
       #
-      # TODO: We have hardcoded port mappings to the docker host, which is
+      # TODO: We have hardcoded port mappings to the first docker host, which is
       # convenient. It also however forces us to have a one-worker-only cluster.
-      # Make it be one hero worker and a pool of 0..n anonymous workers (or just a
-      # sea of anonymous workers)
       #
       hadoop_worker00:
         image_name:   "bd4c/hadoop_worker"
         # node mgr:  console http 8042, localizer 8040, ipc 8041
         # data node: console http 50075, ipc 50020, xceiver 50010
-        ports:         [ "9122:22", "8042:8042", "50075:50075", "50060:50060", 8040, 8041, 50020, 50010 ]
+        ports:         [ "9122:22~ssh", "8042:8042~nmview", "50075:50075~dnview", "50060:50060~tt", "8040~lclzr", "8041~nmipc", "50020~dnipc", "50010~dnxceiver" ]
         links:
           - "hadoop_nn:nn"
           - "hadoop_rm:rm"
@@ -157,9 +153,10 @@ local:
       hadoop_lounge:
         image_name:   "bd4c/hadoop_lounge"
         hostname:     "lounge"
-        ports:         [ "9022:22", "10002:10002" ]
+        ports:         [ "9022:22~ssh", "10000:10000~hue" ]
         volumes:
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
+          - "/Users:/Users:rw"
         volumes_from:
           - "data_gold"
           - "data_outd"
@@ -172,14 +169,16 @@ local:
           - "hadoop_worker00:worker00"
           # - "hadoop_jt:jt"
 
-    # # ===========================================================================
-    # #
-    # # Debugging
-    # #
-    # debug:
-    #   - name:         fiddle
-    #     image_name:   "bd4c/hadoop_base"
-    #     hostname:     "fiddle"
-    #     ports:         [ "9622:22" ]
-    #     volumes_from:
-    #       - "data_gold"
+  # extra ports to open up to allow expansion
+  extra_ports:
+    - 9622~ssh
+    - 9722~ssh
+    - 9822~ssh
+    - 10002~util
+    - 10003~util
+    - 10004~util
+    - 10005~util
+    - 10006~util
+    - 10007~util
+    - 10008~util
+    - 10009~util

@@ -1,17 +1,14 @@
-require 'bundler'
+#!/usr/bin/env rake -f
+begin require 'bundler' ;
+rescue LoadError => err ; abort "The bundler gem is not installed: #{err}; check the README.md\nWithin the #{File.dirname(__FILE__)} directory, run\n'gem install bundler', then 'bundle install', and try again."
+end
+
 Bundler.require(:default, :docker)
 require_relative '../cluster/lib/rucker'
-require_relative '../cluster/lib/rucker/rake_utils'
+require_relative '../cluster/lib/rucker/utils/rake_utils'
 include Rucker::RakeUtils
-
+Pathname.register_paths({ cluster_layout: './rucker.yaml' })
 if (ENV['DOCKER_HOST'].blank? && ENV['NO_DOCKER_HOST'].blank?) then warn "You don't seem to have a DOCKER_HOST environment variable set; if you see an error about socks that's why. Boot2docker users should run 'boot2docker up' and follow the instructions given. If your setup is correct, set the environment variable NO_DOCKER_HOST to anything to make this warning go away" ; end
-
-Pathname.register_paths({
-    cluster_layout: './rucker.yaml'
-  })
-WORLD = Rucker::World.load(Pathname.of(:cluster_layout), 'local')
-
-EXTERNAL_IMAGES  = [ 'blalor/docker-hosts', 'phusion/baseimage:0.9.15', 'radial/busyboxplus', 'bd4c/volume_boxer' ]
 
 #
 # World
@@ -19,24 +16,43 @@ EXTERNAL_IMAGES  = [ 'blalor/docker-hosts', 'phusion/baseimage:0.9.15', 'radial/
 
 desc "Brings all clusters up to running state"
 container_task :up do |names, opts|
-  WORLD.containers_slice(names || :_all).up
+  Rucker.world.containers_slice(names || :_all).up
 end
 
 desc "Brings all clusters up to stopped state if absent; ignores paused or running containers"
 container_task :ready do |names, opts|
-  WORLD.containers_slice(names || :_all).ready
+  Rucker.world.containers_slice(names || :_all).ready
 end
 
 desc "Brings all clusters down to stopped state (if running or paused); ignores absent containers"
 container_task :down do |names, opts|
-  WORLD.containers_slice(names || :_all).down
+  Rucker.world.containers_slice(names || :_all).down
 end
 
 desc "Destroys all containers -- all of them -- from any initial state."
 container_task :nuke_from_orbit do |names, opts|
   names = Rucker.expect_some('container', names)
-  WORLD.containers_slice(names).clear
+  Rucker.world.containers_slice(names).clear
 end
+
+desc "Destroys all containers -- all of them -- from any initial state."
+container_task :logs do |names, opts|
+  names = Rucker.expect_some('container', names)
+  Rucker.world.containers_slice(names).logs
+end
+
+desc "Info"
+container_task :ls do |names, opts|
+  tabler = Rucker::Manifest::Container.table_formatter
+  containers = Rucker.world.containers_slice(names || :_all)
+  full = ENV['full']
+  Rucker.output tabler.table(containers, full: full).join("\n")
+end
+
+task :dump do
+  Rucker.output MultiJson.dump(Rucker.world.to_wire, pretty: true)
+end
+
 
 #
 # Tasks on each cluster
@@ -45,23 +61,23 @@ def cluster_tasks(cl_name)
   namespace cl_name do
     desc "Bring the #{cl_name} cluster up to running state; Can optionally supply '+' delimited container names"
     container_task(:up) do |names, opts|
-      WORLD.cluster(cl_name).containers_slice(names || :_all).up
+      Rucker.world.cluster(cl_name).containers_slice(names || :_all).up
     end
 
     desc "Brings the #{cl_name} cluster up to stopped state if absent; ignores paused or running containers. Can optionally supply '+' delimited container names"
     container_task(:ready) do |names, opts|
-      WORLD.cluster(cl_name).containers_slice(names || :_all).ready
+      Rucker.world.cluster(cl_name).containers_slice(names || :_all).ready
     end
 
     desc "Brings the #{cl_name} down to stopped state (if running or paused); ignores absent containers. Can optionally supply '+' delimited container names"
     container_task(:down) do |names, opts|
-      WORLD.cluster(cl_name).containers_slice(names || :_all).down
+      Rucker.world.cluster(cl_name).containers_slice(names || :_all).down
     end
 
     desc "Destroys all containers in the #{cl_name} cluster -- all of them -- from any initial state, and without consideration for other cluster's wants or needs or feelings; must supply '+' delimited container names, or 'all' to nuke all."
     container_task(:nuke_from_orbit) do |names, opts|
       names = Rucker.expect_some('container', names)
-      WORLD.cluster(cl_name).containers_slice(names).clear
+      Rucker.world.cluster(cl_name).containers_slice(names).clear
     end
   end
 end
@@ -69,27 +85,12 @@ cluster_tasks(:hadoop)
 cluster_tasks(:helpers)
 cluster_tasks(:data)
 
-task :adventure do
-  require 'pry'
-  Pry::Helpers::Text.instance_eval do
-    Rucker.banner('Adventure')
-    puts ""
-    puts "  You are in a dockyard of some kind."
-    puts "  A stern-looking stevedore stands before #{bright_cyan("#{WORLD.clusters.items.count} clusters")} hefting a gaff."
-    puts "  A seedy-looking grifter leans agains a photo booth labelled #{bright_cyan("#{WORLD.images.items.count} images")}, picking her teeth with a stiletto."
-    puts "  Paths lead #{bright_red('up')} and #{bright_red('down')}"
-    puts "  It is dark. #{bright_black('You are likely to be eaten by a grue.')}" if true or actual_world.absent? 
-  end
-  puts ""
-  WORLD.pry
-end
-
 namespace :images do
 
   desc "Pull all images from the docker hub. Takes a while."
   task :pull do
-    p WORLD.images_slice(:_all)
-    # our_images = WORLD.image_names.map{|img_name| tagged_image(img_name) }
+    p Rucker.world.images_slice(:_all)
+    # our_images = Rucker.world.image_names.map{|img_name| tagged_image(img_name) }
     # (EXTERNAL_IMAGES + our_images).each do |img_name|
     #   Rucker.banner("Pull #{img_name} -- this can take a stupidly long time")
     #   sh("docker pull #{img_name}")
@@ -100,7 +101,7 @@ namespace :images do
   # task :tag, :name, :image do |tt, opts|
   #   tag_name   = Rucker.expect_one('tag', opts[:name])
   #   image_name = Rucker.expect_some('image', opts[:image])
-  #   images = (image_name == :_all ? WORLD.image_names : [images])
+  #   images = (image_name == :_all ? Rucker.world.image_names : [images])
   #   images.each do |img_name|
   #     sh "docker tag #{img_name} #{img_name}:#{tag}"
   #   end
@@ -109,7 +110,7 @@ namespace :images do
   # task :push do
   #   tag = Rucker.expect_one(:tag, TAG || 'latest')
   #   puts "Pushing imags prefixed with $DOCKER_ORG=#{DOCKER_ORG} -- this can take a stupidly long time, and you have to be part of the #{DOCKER_ORG} org for it to work."
-  #   WORLD.image_names.each do |img_name|
+  #   Rucker.world.image_names.each do |img_name|
   #     next unless img_name =~ %r{#{DOCKER_ORG}/}
   #     img_name = "#{img_name}:#{tag}"
   #     Rucker.banner("Push #{img_name} -- this can take a stupidly long time")
@@ -119,16 +120,24 @@ namespace :images do
   # 
   # desc "List images in a compact tab-separated form"
   # task_args :ls, :img_names do |img_names|
-  #   Rucker::Actual::Image.dump_images(img_names.to_s)
+  #   Rucker::Actual::ActualImage.dump_images(img_names.to_s)
   # end
   # 
   # desc "History of an image in a compact tab-separated for"
   # task_args :history, :name do |img_name|
   #   img_name ||= Rucker.expect_one('image', IMAGE)
-  #   Rucker::Actual::Image.dump_history(img_name)
+  #   Rucker::Actual::ActualImage.dump_history(img_name)
   # end
 end
 task :images => 'images:ls'
+
+namespace :ports do
+  task :ls do
+    Rucker::Table.display_ports(Rucker.world.containers)    
+  end
+end
+task :ports => 'ports:ls'
+
 
 #
 # Utility
@@ -153,14 +162,14 @@ end
 #   flds.uniq!
 #   flds -= [:host_ports] if flds.include?(:all_ports)
 #   #
-#   WORLD.dump_info(name||:_all, flds)
+#   Rucker.world.dump_info(name||:_all, flds)
 # end
 #
 # namespace :data do
 #   desc "Open a shell on a machine that mounts all volumes in the data cluster"
 #   task :inspector do
-#     inspector = Rucker::Container.new(:data_inspector, 'bd4c/hadoop_base',
-#       volumes_from: WORLD.cluster(:data).container_names,
+#     inspector = Rucker::Manifest::Container.new(:data_inspector, 'bd4c/hadoop_base',
+#       volumes_from: Rucker.world.cluster(:data).container_names,
 #       entrypoint: '/bin/bash')
 #     inspector.run(interactive: true)
 #   end
@@ -169,11 +178,11 @@ end
 #   task_args :snapshot, :container do |names|
 #     tag   = TAG || 'snapshot'
 #     names = names || ENV['CONTAINER']
-#     containers = WORLD.cluster(:data).containers_slice(names || :_all)
+#     containers = Rucker.world.cluster(:data).containers_slice(names || :_all)
 #     show_output = ENV['show_output'].present? || ENV['SHOW_OUTPUT'].present?
 #     containers.each do |ctr|
 #       Rucker.banner("Existing images before incremental for #{ctr.image_name}")
-#       Rucker::Image.dump_images(ctr.image_name)
+#       Rucker::Manifest::Image.dump_images(ctr.image_name)
 #       Rucker.banner("Capturing data from #{ctr.name}")
 #       ctr.start(interactive: show_output)
 #       if show_output
@@ -185,7 +194,7 @@ end
 #       ctr.commit(dest_image_name)
 #       if show_output
 #         Rucker.banner("History:")
-#         Rucker::Image.dump_history(dest_image_name)
+#         Rucker::Manifest::Image.dump_history(dest_image_name)
 #       end
 #       puts "Finished with #{ctr.name} => #{dest_image_name}"
 #     end
@@ -195,15 +204,15 @@ end
 #   task_args :archive, :container do |names|
 #     tag   = TAG || 'archived'
 #     names = names || ENV['CONTAINER']
-#     containers = WORLD.cluster(:data).containers_slice(names || :_all)
+#     containers = Rucker.world.cluster(:data).containers_slice(names || :_all)
 #     show_output = ENV['show_output'].present? || ENV['SHOW_OUTPUT'].present?
 #     #
 #     containers.each do |ctr|
 #       Rucker.banner("Existing images before incremental for #{ctr.image_name}")
-#       Rucker::Image.dump_images(ctr.image_name)
+#       Rucker::Manifest::Image.dump_images(ctr.image_name)
 #       #
 #       Rucker.banner("Capturing data from #{ctr.name} using #{ctr.name}_boxer")
-#       boxer = Rucker::Container.receive(ctr.attributes.merge(
+#       boxer = Rucker::Manifest::Container.receive(ctr.attributes.merge(
 #           image_name: 'bd4c/volume_boxer', name: "#{ctr.name}_boxer",
 #           hostname: nil, links: [], ports: [], volumes_from: [ctr.name]))
 #       boxer.rm(ignore_errors: true)
@@ -238,36 +247,13 @@ end
 # Utility tasks
 #
 
-desc "Uses boot2docker to find the disk free space of the docker host. Do a `rake docker:rmi_blank` if you don't like what you see."
-task :df do
-  sh "boot2docker ssh df -m /mnt/sda1"
-end
-
-task_args :sleep, :duration do |duration|
-  sleep(duration, 1)
-end
-
-
-namespace :docker do
-  desc "Show detailed information on a container"
-  task_args :inspect, :container do |name|
-    Rucker.expect_one('container', name)
-    container = WORLD.container(name)
-    puts container.docker_inspect
+namespace :vhost do
+  desc "Uses boot2docker to find the disk free space of the docker host. Do a `rake docker:rmi_blank` if you don't like what you see."
+  task :df do
+    puts `asdfajlsdkfja`
+    sh "boot2docker ssh df -m /mnt/sda1"
   end
 
-  task :rm_stopped do
-    args = `docker ps -a  | egrep -v ' Up |CONTAINER ID' | cut -c 1-12`.gsub(/[\r\n]/, " ")
-    if args.empty?
-      puts "No stopped containers to kill"
-    else
-      sh "docker rm #{args} ; true"
-    end
-  end
-
-  task :rmi_blank do
-    sh "docker rmi $(docker images | grep '^<none>' | awk '{print $3}') ; true"
-  end
 
   def forward_ports(ports)
     ports.each do |port, name|
@@ -277,22 +263,59 @@ namespace :docker do
     end
   end
 
-  task :open_ports do
-    forward_ports(HADOOP_PORTS)
-    forward_ports(SSH_PORTS)
-    forward_ports(OTHER_PORTS)
+  task :forward_ports do
+    vm = ENV['DOCKER_VM'] || ENV['docker_vm'] || 'boot2docker-vm'
+    Rucker.banner "Instructing VirtualBox to forward all public defined ports from VM named '#{vm}' to host machine"
+    b2d_status = `boot2docker status`.chomp rescue ''
+    Rucker.warn "Boot2Docker is running, so this will probably fail.\n" if b2d_status =~ /running/
+    #
+    Rucker::VirtualBox.forward_ports(Rucker.world.ports)
+  end
+  
+end
+
+task :adventure do
+  require 'pry'
+  world = Rucker.world
+  Rucker.banner('Adventure')
+  Rucker.output "  You are in a dockyard of some kind."
+  Rucker.output "  A burly stevedore stands before ", :brc, "#{world.clusters.items.count} clusters", " of ", :brc, "#{world.containers.items.count} containers", " hefting a gaff,"
+  Rucker.output "  and a seedy-looking grifter leans agains a photo booth labelled '", :brc, "#{world.images.items.count} images", "',"
+  Rucker.output "  picking her teeth with a stiletto."
+  Rucker.output
+  Rucker.output "  The scrolling marquee overhead reads '", :brg, world.state_desc, "'."
+  Rucker.output "  Paths lead ", :brr, 'up', ' and ', :brr, 'down', '.'
+  if world.absent? then Rucker.output "  It is dark. ", :brk, 'You are likely to be eaten by a grue.' ; end
+  Rucker.output ""
+  world.pry
+end
+
+namespace :docker do
+  desc "Show detailed information on a container"
+  task_args :inspect, :container do |name|
+    Rucker.expect_one('container', name)
+    container = Rucker.world.container(name)
+    Rucker.display MultiJson.encode(container.docker_info, pretty: true)
+  end
+
+  task :rm_stopped do
+    Rucker.progress "This will remove all stopped images, whether they belong to the current world or not, without interlocks. Sleeping for 3 seconds and then executing."
+    sleep 3
+    args = `docker ps -a  | egrep -v ' Up |CONTAINER ID' | cut -c 1-12`.gsub(/[\r\n]/, " ")
+    if args.empty?
+      Rucker.warn "No stopped containers to kill"
+    else
+      sh "docker rm #{args} ; true"
+    end
+  end
+
+  task :rmi_blank do
+    Rucker.progress "This will remove all images that aren't tagged with a name, whether they belong to the current world or not. Sleeping for 3 seconds and then executing. Images currently in use by a container will cause a warning message but will not be removed."
+    sleep 3
+    sh "docker rmi $(docker images | grep '^<none>' | awk '{print $3}') ; true"
   end
 end
 
-# The hadoop ports that might potentially be interesting
-HADOOP_PORTS = {
-  8042 => 'nm-console', 50075 => 'dn-console', 8010 => 'dn-jmx',
-  8888 => 'hue', 8088 => 'rm-console', 19888 => 'hist-server', 50070 => 'nn-console' }
-# open ssh ports at 9022, 9122, 9222, etc
-SSH_PORTS = {
-  9022 => 'foyer-ssh', 9122 => 'worker-ssh', 9222 => 'hue-ssh', 9322 => 'rm-ssh', 9422 => 'nn-ssh',
-  9522 => 'snn-ssh',
-  10022 => 'deb-proxy-ssh', }
-OTHER_PORTS  = {
-  10000 => 'deb-proxy',
-  9622 => 'extra-ssh', 9722 => 'extra-ssh', 9822 => 'extra-ssh', 10122 => 'extra-ssh', 10222 => 'extra-ssh',  }
+task :default do
+  abort "Please specify a task name, like 'rake ps' or 'rake up'.\nTo see the list of tasks, run 'rake -T'.\nFor more help, run 'rake --help'."
+end
