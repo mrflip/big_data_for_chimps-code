@@ -15,7 +15,9 @@ module Rucker
       def names()      info['RepoTags'] ; end
 
       # @return [Time] Creation time of this image
-      def created_at() info['Created']            ; end
+      def created_at()
+        Time.at( info['Created'] ).utc.iso8601 rescue nil
+      end
 
       # @return [Integer] Size of all layers that comprise this image
       def size()       info['VirtualSize']        ; end

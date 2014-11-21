@@ -41,7 +41,7 @@ container_task :logs do |names, opts|
   Rucker.world.containers_slice(names).logs
 end
 
-desc "Info"
+desc "List all containers in a compact tab-delimited table"
 container_task :ls do |names, opts|
   tabler = Rucker::Manifest::Container.table_formatter
   containers = Rucker.world.containers_slice(names || :_all)
@@ -97,6 +97,15 @@ namespace :images do
     # end
   end
 
+
+  desc "List all containers in a compact tab-delimited table"
+  task :ls do
+    tabler = Rucker::Manifest::Image.table_formatter
+    images = Rucker.world.images.items.sort_by(&:comparable_name)
+    full = ENV['full']
+    Rucker.output tabler.table(images, full: full).join("\n")
+  end
+  
   # desc "Tag all images with the given tag. Specify an image name, or 'all' for all"
   # task :tag, :name, :image do |tt, opts|
   #   tag_name   = Rucker.expect_one('tag', opts[:name])

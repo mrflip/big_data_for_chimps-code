@@ -24,7 +24,7 @@ module Rucker
 
       def header_row(opts={})
         show_cols.map do |col|
-          vv = str_fmt(col) % col.to_s.titleize
+          vv = str_fmt(col) % title(col).to_s
           vv
         end.join("\t")
       end
@@ -37,6 +37,7 @@ module Rucker
       end
 
       def val_cell(col, val, opts)
+        return (str_fmt(col) % '') if val.nil?
         val = as(col).call(val) if as(col).present?
         fmt(col) % val
       end
@@ -52,7 +53,7 @@ module Rucker
 
       def set_col_format(col, fmt, opts={})
         fmt =~ FORMAT_RE or (warn "Weird format #{fmt}" ; return { fmt: fmt })
-        @formats[col] = { fmt: fmt, show: true,
+        @formats[col] = { fmt: fmt, show: true, title: col.to_s.titleize,
           left: $1.to_s, len: $2.to_i, prec: $3.to_i, type: $4.to_s }.merge(opts)
       end
 
@@ -61,11 +62,12 @@ module Rucker
       def left(col)     formats[col][:left] ; end
       def show?(col) !! formats[col][:show] ; end
       def arr?(col)     formats[col][:type] == 'a' ; end
+      def title(col)    formats[col][:title] ; end
 
       def as(col)       formats[col][:as] ; end
 
       def str_fmt(col)
-        ['%', left(col), len(col), 's'].join
+        ['%-', len(col), 's'].join
       end
 
       def show_cols
@@ -76,8 +78,8 @@ module Rucker
   end
 
   module Manifest
-    Container.class_eval do
 
+    Container.class_eval do
       def self.table_fields
         {
           name:            [ '%-20s', {}  ],
@@ -94,6 +96,32 @@ module Rucker
           volumes_from:    [ '%-23a', {}  ],
           published_ports: [ '%-31a', { as: ->(port){ port.cport_hport } }],
           ports:           [ '%-31a', { show: false} ],
+        }
+      end
+      def self.table_formatter
+        Rucker::Formatter::Table.new(table_fields)
+      end
+    end
+
+    #     PRINTF_FORMAT = %w[%-15s %-15s %-7s %14d %7.1f\ %2s %10s %-23s %-31s %s].join("\t")
+    #     HEADER_FORMAT = %w[%-15s %-15s %-7s %14s   %7s\ %2s %10s %-23s %-31s %s].join("\t") %
+    #       %w[namespace  slug  tag  size  human \  short_id ago name short_cmd]
+    #
+    #     def to_table
+    #       PRINTF_FORMAT % [ns, slug, tag, size, sz_mag, sz_units, short_id, ago, name, short_cmd]
+    #     end
+
+    Image.class_eval do
+      def self.table_fields
+        {
+          namespace:     [ '%-15s', {}  ],
+          slug:          [ '%-15s', {}  ],
+          tag:           [ '%-7s',  {}  ],
+          readable_size: [ '%7s',   { title: 'Size' }  ],
+          size:          [ '%13d',  {}  ],
+          short_id:      [ '%10s',  { title: 'ID' }  ],
+          name:          [ '%-31s', {}  ],
+          created_at:    [ '%-15s', { as: ->(tm){ tm.to_s.gsub(/[-:Z]|\..*/,'').gsub(/T/, '-') } }],
         }
       end
       def self.table_formatter
@@ -144,7 +172,7 @@ module Rucker
     #     def self.from_listing(str)
     #       name, tag, id, ago, sz_num, sz_units = str.chomp.match(LISTING_RE).captures rescue nil
     #       unless sz_units then warn "Bad match: #{str} vs #{LISTING_RE}" ; return ; end
-    #       size = Rucker.human_to_bytes(sz_num, sz_units)
+    #       size = Rucker.human_to_bytes(sz_num, gsz_units)
     #       new(id, "#{name}:#{tag}", size, ago, '')
     #     end
     #

@@ -20,7 +20,7 @@ module Rucker
 
       # @see Rucker::Actual::ActualImage#id
       # @return [String] ID for this image as a long hexadecimal string
-      def id()         actual.try(:id)    ; end
+      def id()         actual.try(:id) || ''  ; end
       # @return [String] ID for this image as a 13-character hexadecimal string
       def short_id()   id[0..12]              ; end
 
@@ -31,6 +31,11 @@ module Rucker
       # @see Rucker::Actual::ActualImage#size
       # @return [Integer] Size of all layers that comprise this image
       def size()       actual.try(:size) ; end
+
+      def readable_size()
+        "%4d %2s" % Rucker.bytes_to_human(size) rescue ''
+      end
+
 
       # Clears any cached information this object might have
       # @return self
@@ -156,6 +161,7 @@ module Rucker
       def slug()   @slug   ||= parsed_name[:slug]   ; end
       def tag()    @tag    ||= parsed_name[:tag]    ; end
       def family() @family ||= parsed_name[:family] ; end
+      def namespace() ns() ;  end
 
       # note: tag versions are derp-sorted: 10.2 precedes 2.0
       def comparable_name()

@@ -47,6 +47,7 @@ module Rucker
   end
 
   def bytes_to_human(size)
+    return [] if size.blank?
     # since 1000-1024 waste 4 digits, and since most things are < 3 gb, roll units at 3072 not 1024
     HUMAN_TO_BYTES.each{|unit, mag| if size.abs > (3 * mag) then return [size.to_f / mag, unit] ; end }
     return [size, 'B']
