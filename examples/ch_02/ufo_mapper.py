@@ -1,19 +1,23 @@
 #!/usr/bin/python
-"""Example MapReduce job: pig latinize words.
-"""
-import sys, re
+# Example MapReduce job: count ufo sightings by location.
 
-def truncate_to_hour(sighted_at):
-  return sighted_at[0:13]
+import sys, re, time, iso8601
 
+# Pull out city/state from ex: Town, ST
+word_finder = re.compile("([\w\s]+),\s(\w+)")
 
-def mapper(line):
-  fields = line.rstrip("\n").split("\t", 8)
-  sighted_at, reported_at, location, blank, duration, description, latitude, longitude, rest = fields
-  
-  hour_sighted = (truncate_to_hour(sighted_at), "1")
-  return "\t".join(hour_sighted)
-
-if __name__ == '__main__':
-  for line in sys.stdin:
-    print mapper(line)
+# Loop through each line from standard input
+for line in sys.stdin:
+  # Remove the carriage return, and split on tabs - maximum of 3 fields
+  fields = line.rstrip("\n").split("\t", 2)
+  try:
+    # Parse the two dates, then find the time between them
+    sighted_at, reported_at, rest = fields
+    sighted_dt = iso8601.parse_date(sighted_at)
+    reported_dt = iso8601.parse_date(reported_at)
+    diff = reported_dt - sighted_dt
+  except:
+    sys.stderr.write("Bad line: {}".format(line))
+    continue
+  # Emit the number of days and one
+  print "\t".join((str(diff.days), "1"))
