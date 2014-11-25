@@ -91,6 +91,7 @@ module Rucker
           created_at:      [ '%-15s', { as: ->(tm){ tm.to_s.gsub(/[-:Z]|\..*/,'').gsub(/T/, '-') } }],
           started_at:      [ '%-15s', { as: ->(tm){ tm.to_s.gsub(/[-:Z]|\..*/,'').gsub(/T/, '-') } }],
           stopped_at:      [ '%-15s', { as: ->(tm){ tm.to_s.gsub(/[-:Z]|\..*/,'').gsub(/T/, '-') } }],
+          exit_code:       [ '%4s',   { title: 'Exit' }  ],
           links:           [ '%-39a', { as: ->(lk){ lk.gsub(/:.*/,'') } }],
           volumes:         [ '%-31a', { show: false } ],
           volumes_from:    [ '%-23a', {}  ],

@@ -191,10 +191,10 @@ module Rucker
     end
 
     class DataContainer < Rucker::Manifest::Container
-      # def _up
-      #   return true if exit_code == 0 # all that matters is that it was started once
-      #   super
-      # end
+      def _up
+        return true if exit_code == 0 # all that matters is that it was started once
+        super
+      end
     end
 
     class ContainerCollection < Rucker::KeyedCollection

@@ -3,6 +3,8 @@ local:
   images:
     # Community-accepted starting points we
     'library/debian:stable':           { 'external': true, est_size: '154.7 MB' }
+    'library/debian:latest':           { 'external': true, est_size: '154.7 MB' }
+    'library/debian:jessie':           { 'external': true, est_size: '154.7 MB' }
     'library/java:7-jdk':              { 'external': true, est_size: '449.8 MB' }
     'radial/busyboxplus:latest':       { 'external': true, est_size: '' }
     'blalor/docker-hosts:latest':      { 'external': true, est_size: '' }

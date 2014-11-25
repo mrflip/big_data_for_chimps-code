@@ -87,16 +87,29 @@ cluster_tasks(:data)
 
 namespace :images do
 
-  desc "Pull all images from the docker hub. Takes a while."
+  desc "Pull all missing images from the docker hub. Takes a while."
   task :pull do
-    p Rucker.world.images_slice(:_all)
-    # our_images = Rucker.world.image_names.map{|img_name| tagged_image(img_name) }
-    # (EXTERNAL_IMAGES + our_images).each do |img_name|
-    #   Rucker.banner("Pull #{img_name} -- this can take a stupidly long time")
-    #   sh("docker pull #{img_name}")
-    # end
+    Rucker.world.images.each do |img|
+      if img.ready?
+        Rucker.progress "#{img.desc} #{img.state}, skipping"
+      else
+        Rucker.banner("Pull #{img.name} -- this can take a stupidly long time")
+        sh("docker pull #{img.name}")
+        img.refresh!
+        Rucker.progress "#{img.desc} #{img.state}\n"
+      end
+    end
   end
 
+  desc "Update all images from the docker hub, overwriting images with the same tag. Takes a while."
+  task :update do
+    Rucker.world.images.each do |img|
+      Rucker.banner("Pull #{img.name} -- this can take a stupidly long time")
+      sh("docker pull #{img.name}")
+      img.refresh!
+      Rucker.progress "#{img.desc} #{img.state}\n"
+    end
+  end
 
   desc "List all containers in a compact tab-delimited table"
   task :ls do
@@ -104,6 +117,10 @@ namespace :images do
     images = Rucker.world.images.items.sort_by(&:comparable_name)
     full = ENV['full']
     Rucker.output tabler.table(images, full: full).join("\n")
+  end
+
+  task :nuke do
+    
   end
   
   # desc "Tag all images with the given tag. Specify an image name, or 'all' for all"
