@@ -1,5 +1,14 @@
 module Rucker
 
+  def self.verbose=(val)
+    @verbose = val
+  end
+
+  def verbose?
+    return @verbose if instance_variable_defined?(:@verbose)
+    ENV['VERBOSE'].present? && (ENV['VERBOSE'].to_s != 'false')
+  end
+
   #
   # Assertions
   #
@@ -31,9 +40,12 @@ module Rucker
   # as a library) or abort (as now, used as a script, when a stack trace would
   # be silly), and gives us control over where the output is sent.
   #
-  def die(msg)
-    # msg = msg.to_s << "\n" << caller[0..1].join(" // ")
-    abort(msg)
+  def die(*lines)
+    first_line = lines.shift
+    if first_line.is_a?(Exception) && Rucker.verbose?
+      first_line = first_line.backtrace.reverse.join("\n") <<  "\n\n" << first_line.to_s
+    end
+    abort(['', first_line, *lines].join("\n"))
   end
 
   #

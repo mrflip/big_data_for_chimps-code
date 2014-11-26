@@ -8,7 +8,16 @@ require_relative '../cluster/lib/rucker'
 require_relative '../cluster/lib/rucker/utils/rake_utils'
 include Rucker::RakeUtils
 Pathname.register_paths({ cluster_layout: './rucker.yaml' })
-if (ENV['DOCKER_HOST'].blank? && ENV['NO_DOCKER_HOST'].blank?) then warn "You don't seem to have a DOCKER_HOST environment variable set; if you see an error about socks that's why. Boot2docker users should run 'boot2docker up' and follow the instructions given. If your setup is correct, set the environment variable NO_DOCKER_HOST to anything to make this warning go away" ; end
+if (ENV['DOCKER_HOST'].blank? && ENV['NO_DOCKER_HOST'].blank?) then warn "No DOCKER_HOST environment variable is set. \nIf you see errors about socks, that's why. \nBoot2docker users should run 'boot2docker up' and follow the instructions given. \nSet the NO_DOCKER_HOST environment variable to make this warning go away.\n\n" ; end
+
+RUCKER_VERBOSE = !! ENV['VERBOSE']
+
+desc "Show detailed status of the docker server and current world"
+task :info do
+  docksvr = Rucker::Actual::DockerServer.new
+  docksvr.dump_info
+  Rucker.world.dump_info
+end
 
 #
 # World
@@ -120,9 +129,9 @@ namespace :images do
   end
 
   task :nuke do
-    
+
   end
-  
+
   # desc "Tag all images with the given tag. Specify an image name, or 'all' for all"
   # task :tag, :name, :image do |tt, opts|
   #   tag_name   = Rucker.expect_one('tag', opts[:name])
@@ -132,7 +141,7 @@ namespace :images do
   #     sh "docker tag #{img_name} #{img_name}:#{tag}"
   #   end
   # end
-  # 
+  #
   # task :push do
   #   tag = Rucker.expect_one(:tag, TAG || 'latest')
   #   puts "Pushing imags prefixed with $DOCKER_ORG=#{DOCKER_ORG} -- this can take a stupidly long time, and you have to be part of the #{DOCKER_ORG} org for it to work."
@@ -143,12 +152,12 @@ namespace :images do
   #     sh("docker push #{img_name}")
   #   end
   # end
-  # 
+  #
   # desc "List images in a compact tab-separated form"
   # task_args :ls, :img_names do |img_names|
   #   Rucker::Actual::ActualImage.dump_images(img_names.to_s)
   # end
-  # 
+  #
   # desc "History of an image in a compact tab-separated for"
   # task_args :history, :name do |img_name|
   #   img_name ||= Rucker.expect_one('image', IMAGE)
@@ -159,7 +168,7 @@ task :images => 'images:ls'
 
 namespace :ports do
   task :ls do
-    Rucker::Table.display_ports(Rucker.world.containers)    
+    Rucker::Table.display_ports(Rucker.world.containers)
   end
 end
 task :ports => 'ports:ls'
@@ -180,7 +189,7 @@ end
 #   by giving either a ':' separated list of fields, or by supplying appropriate env. vars.}
 # task_args :info, :container, :fields do |name, fields_str|
 #   flds = fields_str.to_s.split(/:\s*/).map(&:to_sym)
-# 
+#
 #   flds += [:volumes, :host_ports] if flds.blank?
 #   flds += [:full, :volumes, :all_volumes, :host_ports, :all_ports, :links, :volumes_from, :full_image_id, :image_id].map do |fld|
 #     fld if ENV[fld.to_s] || ENV[fld.to_s.upcase] || flds.include?(:full)
@@ -199,7 +208,7 @@ end
 #       entrypoint: '/bin/bash')
 #     inspector.run(interactive: true)
 #   end
-# 
+#
 #   desc "Snapshot incremental changes to a data image; supply 'show_output=true' to see detailed progress."
 #   task_args :snapshot, :container do |names|
 #     tag   = TAG || 'snapshot'
@@ -225,7 +234,7 @@ end
 #       puts "Finished with #{ctr.name} => #{dest_image_name}"
 #     end
 #   end
-# 
+#
 #   desc "Capture data to a new boxer-volume image; supply 'show_output=true' to see detailed progress"
 #   task_args :archive, :container do |names|
 #     tag   = TAG || 'archived'
@@ -261,12 +270,12 @@ end
 #         # Rucker::Actual::Image.dump_history(dest_image_name)
 #       end
 #       #
-# 
+#
 #       #
 #       puts "Finished with #{ctr.name} => #{dest_image_name}"
 #     end
 #   end
-# 
+#
 # end
 
 #
@@ -297,7 +306,7 @@ namespace :vhost do
     #
     Rucker::VirtualBox.forward_ports(Rucker.world.ports)
   end
-  
+
 end
 
 task :adventure do

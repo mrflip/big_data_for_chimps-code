@@ -38,14 +38,14 @@ local:
     # Helper images
     #
     helpers:
-      host_filer:
+      hostname_bot:
         doc:         "Manages /etc/hosts on all containers, allowing discovery"
         image_name:  "blalor/docker-hosts:latest"
-        entry_args:  ["/srv/hosts"]
+        entry_args:  ["/srv/hostname_bot/hosts"]
         volumes:
-          - "/var/lib/docker/hosts:/srv/hosts"
+          - "/var/lib/hostname_bot:/srv/hostname_bot"
           - "/var/run/docker.sock:/var/run/docker.sock"
-        hostname:     "host-filer"
+        hostname:     "hostname_bot"
 
       es:
         doc:         "Elasticsearch server for Lipstick"
@@ -92,7 +92,7 @@ local:
           - data_nn
         volumes:
            # dynamic /etc/hosts file
-          - "/var/lib/docker/hosts:/etc/hosts:ro"
+          - "/var/lib/hostname_bot/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
       hadoop_snn:
@@ -103,7 +103,7 @@ local:
         links:
           - "hadoop_nn:nn"
         volumes:
-          - "/var/lib/docker/hosts:/etc/hosts:ro"
+          - "/var/lib/hostname_bot/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
       hadoop_rm:
@@ -115,7 +115,7 @@ local:
         links:
           - "hadoop_nn:nn"
         volumes:
-          - "/var/lib/docker/hosts:/etc/hosts:ro"
+          - "/var/lib/hostname_bot/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
       # hadoop_jt:
@@ -126,7 +126,7 @@ local:
       #   links:
       #     - "hadoop_nn:nn"
       #   volumes:
-      #     - "/var/lib/docker/hosts:/etc/hosts:ro"
+      #     - "/var/lib/hostname_bot/hosts:/etc/hosts:ro"
       #     - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
 
       #
@@ -143,7 +143,7 @@ local:
           - "hadoop_rm:rm"
           # - "hadoop_jt:jt"
         volumes:
-          - "/var/lib/docker/hosts:/etc/hosts:ro"
+          - "/var/lib/hostname_bot/hosts:/etc/hosts:ro"
           - "/bulk/hadoop/log:/bulk/hadoop/log:rw"
         volumes_from:
           - "data_hdfs0"

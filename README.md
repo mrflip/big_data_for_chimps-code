@@ -3,13 +3,12 @@
 The first step is to clone this repo:
 
 ```
-git clone --recursive http://github.com/mrflip/big_data_for_chimps-code.git bd4c-code
+    $ git clone --recursive http://github.com/mrflip/big_data_for_chimps-code.git bd4c-code
 ```
 
 _TODO: change the git address when we move the repo_
 
-You will now see a directory called `bd4c-code`
-
+You will now see a directory called `bd4c-code`.
 
 Everything below (apart from one quick step) should take place in the `bd4c-code/cluster/` directory. **DO NOT USE THE `bd4c-code/docker/` DIRECTORY** -- that is for generating the docker containers, and you will want to use the pre-validated ones to start off.
 
@@ -18,91 +17,197 @@ For the experienced and reckless, there's a compact summary version following th
 * /README.md -- walkthrough and summary
 * /notes/Troubleshooting.md -- detailed checks on each component
 
-## Dockering I: Preliminaries
+## Quickstart for the experienced and reckless
+
+
+Here's the TL;DR summary. Clone the repo and install the dependencies.
+
+```
+git clone --recursive http://github.com/mrflip/big_data_for_chimps-code.git bd4c-code
+cd bd4c-code
+gem install bundler
+bundle install
+```
+
+If you're running boot2docker, you'll want to forward the virtual machine's ports to your host system.
+
+```
+boot2docker down
+rake docker:open_ports
+$(boot2docker up 2>&1 | egrep '^ *export')
+```
+
+Start your docker server, and validate that everything is a-OK:
+
+```
+env | grep DOCKER  # should show a valid DOCKER_HOST, etc.
+docker info        # should have no errors or obvious defects
+rake info          # ditto
+``` 
+
+Pull in the images, then go read 'Big Data for Chimps' for 10-40 minutes as 6GB of data rolls in:
+
+```
+rake images:pull
+```
+
+Bring the cluster up:
+
+```
+rake ready
+rake up
+```
+
+Now you can log on to the `hadoop_lounge` machine.
+
+```
+ssh -i insecure_key.pem chimpy@DOCKER_ADDR:9022 
+```
+
+Replace `DOCKER_ADDR` with the Docker Host IP address from `rake info`, or as given to you when you installed docker.
+
+And you can view the Hue console at http://DOCKER_ADDR:10000/
+
+
+## Cluster Setup Part I: Preliminaries
 
 ### Prerequisites
 
-* Docker
-* Boot2Docker, if you're on OSX
-* Ruby
 * Basic comfort pasting things into a terminal window and hitting enter.
+* Ruby interpreter
+* A Docker server -- we recommend Boot2Docker, if you're on OSX or Windows
+
+### Ruby and Required Libraries
+
+These scripts require a reasonably modern version of ruby (> 2.0 preferred, but certainly >= 1.9.2). Open a terminal window and run the following at the command line:
+
+        bd4c-code/cluster$ ruby --version
+    ruby 2.1.4p265 (2014-10-27 revision 48166) [x86_64-darwin13.0]
+
+_(We'll indent command lines by four spaces in these listings so you can identify the input from output. Your job is to be in the directory to the left of the $ and run the command to the right of the $.)_
+
+If you don't like what you see, follow the instructions at [the official Ruby website](https://www.ruby-lang.org/en/installation/). The Ruby that is pre-installed with all recent versions of OSX should work fine, and so will any of the other ways they recommend. Linux users should use [the appropriate package manager](https://www.ruby-lang.org/en/installation/), and Windows users reportedly have best success with [RubyInstaller](https://www.ruby-lang.org/en/installation/#rubyinstaller).
+
+Next, install the required libraries:
+
+        bd4c-code/cluster$ gem install bundler
+    Fetching: bundler-1.7.7.gem (100%)
+    Successfully installed bundler-1.7.7
+    1 gem installed
+
+        bd4c-code/cluster$ bundle install
+    Using rake 10.3.2
+      ...(snip)...
+    Using bundler 1.7.7
+    Your bundle is complete!
+    Use `bundle show [gemname]` to see where a bundled gem is installed.
+
 
 ### Running under boot2docker
 
 #### Port Forwarding
 
-By forwarding selected ports from the Boot2Docker VM to the OSX host, you'll be able to ssh directly to the machines from your regular terminal window, and will be able to directly browse the various web interfaces. It's highly recommended, but you need to pause the boot2docker VM for a moment to accomplish this. Let's do that now before we dive in:
+By forwarding selected ports from the Boot2Docker VM to the OSX host, you'll be able to ssh directly to the machines from your regular terminal window, and will be able to directly browse the various web interfaces. It's highly recommended, but you need to pause the boot2docker VM for a moment to accomplish this. Let's do that now before we dive in.
 
 ```
-boot2docker down
-rake docker:open_ports
+    bd4c-code/cluster$ boot2docker down
+    bd4c-code/cluster$ rake docker:open_ports
 ```
 
-#### You're going to need a bigger boat.
+#### Increase size of the Boot2Docker VM
 
-While you have the VM down, you should also increase the amount of memory you're allocating to the VM. In VirtualBox manager, select your `boot2docker-vm` and hit 'Settings'. Under the System tab, you will see the base memory slider -- adjust that to at least 4GB, but not higher than 30-50% of the physical ram on your machine.
+While you have the VM down, you should also increase the amount of memory you're allocating to the VM.
 
-The default 20GB virtual hard drive allocated for boot2docker will be a bit tight, but it's a pain in the butt to resize so might as well wait until it's a problem
+* Open the VirtualBox manager (the standalone program that looks like a cube, not a VM)
+* Select the virtual machine, probably called  `boot2docker-vm`.
+* Hit 'Settings'.
+  - Under the System tab, you will see the base memory slider
+  - adjust that to at least 4GB, 6-8GB if you can spare it. Don't go higher than 50% of the physical ram on your machine, though.
 
-#### `DOCKER_HOST` and `DOCKER_IP` environment variables
+Please also note that the size of boot2docker's virtual hard drive is 20GB by default. We'll be taking up about 6GB of it from the start for the data and machine images, and of course you will then use it to generate lovely output data. As long as we don't have to share with any other heavy users, though, the 20GB is quite enough space, and resizing the boot2docker volume is a giant pain. So cross that bridge if you meet it. If you find that your drive is full but you haven't generated anything like 14GB of additional data, see the troubleshooting document -- it's possibly a flaw in current docker.
 
-Bring boot2docker back up with
+### Environment Variables: `DOCKER_HOST` and friends
+
+The `docker` command and our runner scripts use a set of environment variables -- `DOCKER_HOST`, plus `DOCKER_CERT_PATH` and `DOCKER_TLS_VERIFY` if secure-connections are enabled -- to discover the docker server.
+
+#### For boot2docker users:
+
+Starting boot2docker as follows will start the vm and set the magic environment variables in one go:
 
 ```
+$(boot2docker up 2>&1 | egrep '^ *export')
 boot2docker up
 ```
 
-When you run `boot2docker up`, it will either tell you that you have the env variable set already (hooray) or else tell you the env variable to set. You should not only set its value in your current terminal session, you should add it and a friend to your `.bashrc` file. The address will vary depending on circumstances, but using the current value on my machine I have added these lines:
+The first command is actually all you need, but we kidnap its output to set the environment variables, so we run the second line to affirm that it worked. In action:
+
+
+        bd4c-code/cluster$ $(boot2docker up 2>&1 | egrep '^ *export')
+        bd4c-code/cluster$ boot2docker up
+    Waiting for VM and Docker daemon to start...
+    .o
+    Started.
+    Writing /Users/flip/.boot2docker/certs/boot2docker-vm/ca.pem
+    Writing /Users/flip/.boot2docker/certs/boot2docker-vm/cert.pem
+    Writing /Users/flip/.boot2docker/certs/boot2docker-vm/key.pem
+    Your environment variables are already set correctly.
+
+
+#### For others
+
+Users of a non-local docker server should set those three variables in their `.bashrc` file. (boot2docker users can too, as the hostname usually stays constant from run to run -- but it's all according to VirtualBox's whim and I find the port changes from time to time). Using the current values on my machine, I have these lines in my `.bashrc`:
 
 ```
-export DOCKER_IP=192.168.59.103
-export DOCKER_HOST=tcp://$DOCKER_IP:2375
+export DOCKER_ADDR=192.168.59.103
+export DOCKER_HOST=tcp://$DOCKER_ADDR:2375
+export DOCKER_TLS_VERIFY=1
+export DOCKER_CERT_PATH=$HOME/.boot2docker/certs/boot2docker-vm
 ```
 
-The `DOCKER_IP` variable isn't necessary for docker, but it will be useful for working at the commandline -- when we refer to `$DOCKER_IP` in the following we mean just that bare IP address of the docker<->host bridge.
+#### Check that Docker is ready to go
 
-### Install the script dependencies
+You can check the environment variables as follows. Note the IP address in DOCKER_HOST (i.e. without the `tcp://` or `2375`) -- we'll refer to it with the shorthand `DOCKER_ADDR` when we need it.
 
-We'll need a couple common dependencies for the scripts we'll use. Using a reasonably modern version of ruby (> 1.9.2, > 2.0 preferred):
+        bd4c-code/cluster$ env | grep DOCKER
+    DOCKER_HOST=tcp://192.168.59.103:2375
+    DOCKER_TLS_VERIFY=1
+    DOCKER_CERT_PATH=/Users/flip/.boot2docker/certs/boot2docker-vm
 
-```
-gem install bundler
-bundle install
-rake ps
-```
+(Only set `DOCKER_TLS_VERIFY=1` if your docker does indeed use secure connections. If you see the unhelpful error message `malformed HTTP response "\x15\x03\x01\x00\x02\x02"`, your docker expects TLS and you're not supplying it.)
 
-If your ruby environment is good, the last command will give similar output to running `docker ps -a`.
+Run the `docker info` command. Your details may vary from the partial output shown; the important thing is that it completes without error.
+
+        bd4c-code/cluster$ bundle install
+    Containers: 0
+    Images: 0
+    EventsListeners: 0
+    Init Path: /usr/local/bin/docker
+      ...snip..
+    Registry: [https://index.docker.io/v1/]
+
+
+        bd4c-code/cluster$ rake docker:info
+    Global info for tcp://192.168.59.103:2376
+    Containers:     0
+    Images:         458
+    Registry:       https://index.docker.io/v1/
+    Root Volume:    /mnt/sda1/var/lib/docker/aufs
+    PortForwarding: true
+    Docker Version: {"ApiVersion"=>"1.15", "Arch"=>"amd64", "GoVersion"=>"go1.3.3", ...}
+
+If your ruby environment is good, the last command's output will be similar to that of `docker info`. _(Ours highlights only the essential info and uses more-familiar terms. It's also tab-delimited, allowing cut and sort to work. Again, all you care about is that there are no errors or flaming defects in what you see.)_
 
 ### Pull in the containers
 
-The first step will be to pre-seed the containers we'll use. This is going to bring in more than 4 GB of data, so don't do this at a coffee shop, and do be patient.
+Our tools are in place, now we need the raw materials.
+
+The following will pre-seed the containers we'll use. This is going to bring in more than 4 GB of data, so don't do this at a coffee shop, and do be patient.
 
 ```
 rake images:pull
 ```
 
 You can do the next step while that proceeds.
-
-### Minor setup needed on the docker host
-
-The namenode insists on being able to resolve the hostnames of its clients -- something that is far more complex in Dockerland than you'd think.
-
-For Boot2Docker users, we have a pretty painless solution, but it requires a minor intervention on the docker host. Visit it (`boot2docker ssh`, probably) and run:
-
-```
-boot2docker ssh                          # or however you get onto the docker host
-sudo touch        /var/lib/docker/hosts  # so that docker-hosts can make container hostnames resolvable
-sudo chmod 0644   /var/lib/docker/hosts
-sudo chown nobody /var/lib/docker/hosts
-```
-
-<!-- We'll also share the log directories onto a volume readable from the docker host and all cluster containers. At no cost, this lets you tail all of the services' logs from one place: -->
-
-<!-- ``` -->
-<!-- mkdir -p          /bulk/hadoop           # You'll be able to view all logs here -->
-<!-- ``` -->
-
-Leave a terminal window open on the docker host, as we'll do a couple more things over there.
 
 ### Wait until the pull completes
 
@@ -164,9 +269,9 @@ Running `rake ps` will now show 12 containers: one helper, the five data contain
 
 #### Hue Web console.
 
-The friendly Hue console will be available at http://DOCKER_IP:9001/ in your browser (substitute the ip address of your docker). The login and password are 'chimpy' and 'chimpy'. Ignore any whining it does about Oozie or Pig not working -- those are just front-end components we haven't installed.
+The friendly Hue console will be available at http://DOCKER_ADDR:9001/ in your browser (substitute the ip address of your docker). The login and password are 'chimpy' and 'chimpy'. Ignore any whining it does about Oozie or Pig not working -- those are just front-end components we haven't installed.
 
-* Visit the File Browser and drill down to http://$DOCKER_IP:9001/filebrowser/#/data/gold  You'll see all the different datasets we'll use. There's lots of fun stuff in there -- finishing the book will leave you ready to design your own investigations, and so we've provided lots of territory to explore.
+* Visit the File Browser and drill down to http://DOCKER_ADDR:9001/filebrowser/#/data/gold  You'll see all the different datasets we'll use. There's lots of fun stuff in there -- finishing the book will leave you ready to design your own investigations, and so we've provided lots of territory to explore.
 * Visit the Job Browser. Nothing going on yet, of course, but you'll be back here in a moment.
 
 #### SSH terminal access
@@ -174,15 +279,15 @@ The friendly Hue console will be available at http://DOCKER_IP:9001/ in your bro
 You will also spend some time commanding a terminal directly on the machine. Even if you're not one of the many people who prefer the commandline way, in the later chapters you'll want to peek under the covers of what's going on within each of the machines. SSH across by running
 
 ```
-ssh -i insecure_key.pem chimpy@$DOCKER_IP -p 9022
+ssh -i insecure_key.pem chimpy@DOCKER_ADDR -p 9022
 ```
 
 All of the nodes in the cluster are available for ssh. Using the normal SSH port of 22 as a mnemonic, we've set each container up in ascending centuries:
 
-* Lounge:	      9022
-* Worker:	      9122
+* Lounge:         9022
+* Worker:         9122
 * Resource Manager:   9322 (manages but does not run jobs -- the new-school jobtracker)
-* Namenode:	      9422 (manages but does not hold data)
+* Namenode:       9422 (manages but does not hold data)
 * Secondary Namenode: 9522 (keeps the namenode healthy. Does *not* act as a failover namenode)
 
 9222 is reserved for a second worker, if you have the capacity.
