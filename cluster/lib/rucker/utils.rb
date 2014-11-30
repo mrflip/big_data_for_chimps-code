@@ -1,5 +1,55 @@
 module Rucker
 
+  # Sorts repo_tag names in order by
+  #
+  # * slug, since equivalent slugs imply equivalent functions; then
+  # * registry, because private registries are preferable to public; then
+  # * tags starting with '_', so you can force an image to the head; then
+  # * tagged 'latest', then by descending numeric part of tag if any, because
+  #   software quality only increases over time;
+  # * then tag name, to break ties,
+  # * then repo, to break ties.
+  #
+  # This ordering is both visually pleasing and lets you call
+  # `sort_by(...).first` for a good guess at the best available image to launch.
+  #
+  # @example img.repo_tags.sort_by{ Rucker.repo_tag_order(tag) }
+  #   [
+  #     "z.com/zzz/bar:_override",
+  #     "a.com/yyy/bar",
+  #     "a.com/yyy/bar:latest",
+  #     "a.com/foo/bar:r9.0",
+  #     "a.com/foo/bar:1.2",
+  #     "b.com/aaa/bar:latest",
+  #           "foo/bar:r10.1",
+  #           "aaa/bar:r9.0",
+  #           "foo/bar:r9.0",
+  #           "zzz/bar:r9.0",
+  #           "zzz/bar:r9.0-alpha",
+  #           "zzz/bar:r9.0-beta",
+  #           "foo/bar:r0.1",
+  #     "a.com/foo/helper",
+  #           "foo/helper",
+  #     "a.com/foo/zazz", ]
+  #
+  def self.repo_tag_order(name)
+    ph = Docker::Util.parse_reg_repo_tag(name)
+    ordinary = 1
+    case ph[:tag].to_s
+    when /^_/             then num = - Float::INFINITY ; ordinary = -1
+    when ''               then num = - Float::INFINITY
+    when 'latest'         then num = - Float::INFINITY
+    when /(\d+\.\d+|\d+)/ then num = - $1.to_f
+    else                       num = 0
+    end
+    reg_str = ph[:reg].present? ? ph[:reg] : '||||||' # make private registries precede public
+    [ ph[:slug].to_s, ordinary, reg_str.to_s, num, ph[:tag].to_s, ph[:repo].to_s ]
+  end
+
+  #
+  # Config stuff, which lives too much everywhere.
+  #
+  
   def self.verbose=(val)
     @verbose = val
   end

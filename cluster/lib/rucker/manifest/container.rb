@@ -18,17 +18,12 @@ module Rucker
       #
       collection :ports,   Rucker::Manifest::PortBindingCollection
       #
-      accessor_field :actual, Rucker::Actual::ActualContainer
+      accessor_field :actual, Rucker::Actual::ActualContainer, writer: true
       protected :actual
-      accessor_field :image,  Rucker::Manifest::Image
+      accessor_field :image,  Rucker::Manifest::Image, writer: true
       protected :image
       #
       class_attribute :max_retries; self.max_retries = 10
-
-      def receive_image_name(val)
-        img_name = Rucker::Manifest::Image.normalize_name(super(val))
-        write_attribute(:image_name, img_name)
-      end
 
       def state
         return :absent if self.actual.blank?
@@ -119,63 +114,62 @@ module Rucker
       # Creates a container rfomr the specified image and prepares it for
       # running the specified command. You can then start it at any point.
       def _create
-        Rucker.progress("  Creating #{desc}")
+        Rucker.progress(:creating, self)
         self.actual = Rucker::Actual::ActualContainer.create_from_manifest(self)
         forget() ; self
       end
 
       # Start a created container
       def _start
-        Rucker.progress("  Starting #{desc}")
+        Rucker.progress(:starting, self)
         actual.start_from_manifest(self)
         forget() ; self
       end
 
       # Stop a running container by sending `SIGTERM` and then `SIGKILL` after a grace period
       def _stop
-        Rucker.progress("  Stopping #{desc}")
+        Rucker.progress(:stopping, self)
         actual.stop_from_manifest(self)
         forget() ; self
       end
 
       # Remove a container completely.
       def _remove
-        Rucker.progress("  Removing #{desc}")
+        Rucker.progress(:removing, self)
         actual.remove('v' => 'true')
         forget() ; self
       end
 
       # Pause all processes within a container. The docker pause command uses the cgroups freezer to suspend all processes in a container. Traditionally when suspending a process the SIGSTOP signal is used, which is observable by the process being suspended. With the cgroups freezer the process is unaware, and unable to capture, that it is being suspended, and subsequently resumed.
       def _pause()
-        Rucker.progress("  Pausing #{desc}")
+        Rucker.progress(:pausing, self)
         actual.pause()
         forget() ; self
       end
 
       # The docker unpause command uses the cgroups freezer to un-suspend all processes in a container.
       def _unpause()
-        Rucker.progress("  Unpausing #{desc}")
+        Rucker.progress(:unpausing, self)
         actual.pause()
         forget() ; self
       end
 
-      def commit(committed_image_name)
-        Rucker.progress("  Creating a new image from current state of ", :brg, desc)
-        img = actual.commit(committed_image_name)
-        Rucker.progress("  Created image ", :brc, " #{img.names.join(',')} id #{img.id}")
-
+      def commit(new_name)
+        Rucker.progress(:creating, "image #{new_name}", from: ['current state of', :cya, self.desc])
+        img = actual.commit(new_name)
+        Rucker.progress(:created,  img, now: "has names #{img.names.join(',')} and id #{img.short_id}")
         world.refresh!
         self
       end
 
       # Display the running processes of a container. Options are passed along to PS.
       def top(opts={})
-        Rucker.progress("  Showing top processes for ", :brg, desc)
+        Rucker.progress(:listing_processes_on, self)
         Rucker.output( actual.top(opts) )
       end
 
       def logs(opts={})
-        Rucker.progress("  Showing #{desc}'s logs")
+        Rucker.progress(:showing_logs_for, self)
         opts = opts.reverse_merge(stdout: true, stderr: true, tail: 1000, timestamps: true)
         Rucker.output( actual.logs(opts) )
       end
@@ -225,8 +219,8 @@ module Rucker
 
       def invoke_until_satisfied(operation, *args)
         max_retries.times do |idx|
-          Rucker.progress("#{operation} -> #{belongs_to.desc} (#{length} #{item_type.type_name})#{idx > 1 ? " (#{idx})" : ''}")
-          Rucker.progress("  #{desc} are #{state_desc}")
+          Rucker.output("#{operation} -> #{belongs_to.desc} (#{length} #{item_type.type_name})#{idx > 1 ? " (#{idx})" : ''}")
+          Rucker.output("  #{desc} are #{state_desc}")
           successes = items.map do |ctr|
             begin
               ctr.public_send(:"_#{operation}", *args)

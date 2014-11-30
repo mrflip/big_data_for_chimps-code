@@ -57,7 +57,10 @@ module Rucker
 
       def self.accessor_field(name, type=Whatever, opts={})
         name = name.to_sym
-        attr_accessor name
+        attr_reader name
+        attr_writer name if opts[:writer]
+        ivar_name = :"@#{name}"
+        define_method(:"unset_#{name}"){ remove_instance_variable(ivar_name) if instance_variable_defined?(ivar_name)}
         self.accessor_fields += [name]
       end
 

@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e ; set -x
 
+# listing space-separated roles in the `$HADOOP_IAMA` environment variable
+# nominate this container itself into that role.
+#
+# Example:
+#    HADOOP_IAMA="RM NN"
+#    # sets HADOOP_NN_HOSTNAME and HADOOP_RM_HOSTNAME to the output of running `hostname`
+#
+for iama in $HADOOP_IAMA SELF ; do
+  export "HADOOP_${iama}_HOSTNAME=$(hostname)"
+done 
+
+# Dump the current env var set
+echo "Environment variables associated with HADOOP|TCP|UDP|PORT|ADDR|DIR:"
+env | egrep 'HADOOP|TCP|UDP|PORT|ADDR|DIR' || true
+
 #
 # This will be run by the my_init process at container startup
 #

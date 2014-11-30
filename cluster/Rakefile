@@ -100,12 +100,12 @@ namespace :images do
   task :pull do
     Rucker.world.images.each do |img|
       if img.ready?
-        Rucker.progress "#{img.desc} #{img.state}, skipping"
+        Rucker.progress(:pulling, img, skipped: img.state_desc)
       else
-        Rucker.banner("Pull #{img.name} -- this can take a stupidly long time")
+        Rucker.progress(:pulling, img, note: 'this can take a really long time')
         sh("docker pull #{img.name}")
         img.refresh!
-        Rucker.progress "#{img.desc} #{img.state}\n"
+        Rucker.progress(:pulled, img, now: img.state_desc)
       end
     end
   end
@@ -116,7 +116,7 @@ namespace :images do
       Rucker.banner("Pull #{img.name} -- this can take a stupidly long time")
       sh("docker pull #{img.name}")
       img.refresh!
-      Rucker.progress "#{img.desc} #{img.state}\n"
+      Rucker.progress :updated, img, now: img.state_desc
     end
   end
 
@@ -334,7 +334,8 @@ namespace :docker do
   end
 
   task :rm_stopped do
-    Rucker.progress "This will remove all stopped images, whether they belong to the current world or not, without interlocks. Sleeping for 3 seconds and then executing."
+    Rucker.banner "This will remove all stopped images, whether they belong to the current world or not, without interlocks."
+    Rucker.output "Sleeping for 3 seconds and then removing, so kill me now if you've changed your mind."
     sleep 3
     args = `docker ps -a  | egrep -v ' Up |CONTAINER ID' | cut -c 1-12`.gsub(/[\r\n]/, " ")
     if args.empty?
@@ -345,7 +346,8 @@ namespace :docker do
   end
 
   task :rmi_blank do
-    Rucker.progress "This will remove all images that aren't tagged with a name, whether they belong to the current world or not. Sleeping for 3 seconds and then executing. Images currently in use by a container will cause a warning message but will not be removed."
+    Rucker.banner "This will remove all images that aren't tagged with a name, whether they belong to the current world or not. Images currently in use by a container will cause a warning message but will not be removed."
+    Rucker.output "Sleeping for 3 seconds and then removing, so kill me now if you've changed your mind."
     sleep 3
     sh "docker rmi $(docker images | grep '^<none>' | awk '{print $3}') ; true"
   end

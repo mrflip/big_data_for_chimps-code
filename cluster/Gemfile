@@ -8,5 +8,5 @@ gem 'multi_json', ">= 1.1"
 
 group :docker do
   gem 'childprocess'
-  gem 'docker-api', :require => 'docker'
+  gem 'docker-api', :require => 'docker', :github => 'mrflip/docker-api', :branch => 'master'
 end

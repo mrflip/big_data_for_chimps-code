@@ -26,9 +26,47 @@ module Rucker
     puts
   end
 
+  MOODS = {
+    adding:   :brg, creating: :brg, pulling: :brg, sending: :brg,
+    updating: :brb, pushing:  :brb, tagging: :brb, downloading: :brb,
+    starting: :brb, unpausing: :brb,
+    stopping: :red, pausing:  :red,
+    removing: :brr,
+    with:     :grn, as: :grn,
+    note:     :red,
+
+  }
+  # completed actions are neutral
+  %w[added created pulled pushed tagged removed
+     stopped started paused unpaused sent downloaded
+     ].each{|mood| MOODS[mood.to_sym] = :blu }
+
   # Announce an essential step in a process
-  def progress(*text, &blk)
-    puts formatter.format(*text, &blk)
+  def progress(action, subj, opts={})
+    opts      = opts.reverse_merge(indent: 1)
+    indent    = opts.delete(:indent)
+    skipped   = opts.delete(:skipped)
+    subj_desc = (subj.respond_to?(:desc) ? subj.desc : subj)
+    #
+    mood      = MOODS[action] || :normal
+    mood      = :normal if skipped.present?
+    action_str = action.to_s.humanize
+    action_str = "not #{action_str}" if skipped
+    #
+    text = []
+    text << ("  "*indent)
+    text << mood << ("%-12s" % action_str) << ' '
+    text << :cya << ("%-30s" % subj_desc)
+    #
+    opts.each do |phrase, words|
+      text << ' ' << phrase.to_s << ' '
+      text << MOODS[phrase] if MOODS.include?(phrase)
+      text << words
+    end
+    text << " (Skipped because #{skipped})" if skipped
+    #
+    text = text.flatten
+    output(*text)
   end
 
   # Deliver a block of text
@@ -86,14 +124,15 @@ module Rucker
       :bold       => ["\e[1m",	    ],
       :normal     => ["\e[0m",	    ],
     }
-    ({
+    {
       :blk => :black,                            :grn => :green,      :ylw => :yellow,
       :blu => :blue,        :mag => :magenta,    :cyn => :cyan,       :wht => :white,
       :brk => :br_black,    :brr => :br_red,     :brg => :br_green,   :bry => :br_yellow,
       :brb => :br_blue,     :brm => :br_magenta, :brc => :br_cyan,    :brw => :br_white,
       :pur => :magenta,     :purple => :magenta, :brp => :br_magenta,  :br_purple => :br_magenta,
+      :cya => :cyan,
       :bld => :bold,        :off => :normal,     :norm => :normal,
-    }).each{|shortname, name| COLORS[shortname] = COLORS[name] }
+    }.each{|shortname, name| COLORS[shortname] = COLORS[name] }
   end
 
   # If the $COLORIZE environment variable is set to true or false, colors will

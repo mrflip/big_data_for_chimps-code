@@ -16,7 +16,7 @@ require 'gorillib/model/positional_fields'
 require 'gorillib/model/serialization'
 
 require_relative 'rucker/utils/formatter'
-require_relative 'rucker/utils/misc'
+require_relative 'rucker/utils'
 require_relative 'rucker/keyed_collection'
 #
 require_relative 'rucker/actual/actual_container'

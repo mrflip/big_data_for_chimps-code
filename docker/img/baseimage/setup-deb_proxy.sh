@@ -15,5 +15,4 @@ route -n | awk '/^0.0.0.0/ {print $2}' > /tmp/docker_host_ip
 
 # Use the deb-proxy cacher if available. It's not worth doing earlier because the apt-update stuff isn't cached.
 rm /etc/apt/apt.conf.d/30autoproxy
-echo "Acquire::http::Proxy \"http://`cat /tmp/docker_host_ip`:10000\";" > /etc/apt/apt.conf.d/40squid-deb-proxy
-
+echo "Acquire::http::Proxy \"http://`cat /tmp/docker_host_ip`:10004\";" > /etc/apt/apt.conf.d/40squid-deb-proxy

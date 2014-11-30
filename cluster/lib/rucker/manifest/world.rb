@@ -96,6 +96,31 @@ module Rucker
         clusters.map{|cl| cl.state }.flatten.uniq.sort
       end
 
+      def self.load_credentials(registry)
+        docker_creds = File.expand_path(ENV['DOCKER_CREDENTIALS'] || '~/.docker_credentials')
+        raise "docker credentials file doesn't exist" if not File.exists?(docker_creds)
+        #
+        creds_list = MultiJson.load(File.read(docker_creds))
+        serveraddress = creds_list.keys.grep(registry).first
+        creds = creds_list[serveraddress] or raise "No credentials for '#{registry}' present in #{creds_list.keys}"
+        creds['serveraddress'] ||= serveraddress
+        return creds
+      rescue StandardError => err
+        raise err.class, "Could not load credentials from #{docker_creds}: #{err.message}. Run 'docker login', then set $DOCKER_CREDENTIALS to the file it creates, and $DOCKER_REG_ACCT / $DOCKER_REG_PASS to the registry username we should apply.", err.backtrace
+      end
+
+      #
+      # To use this, Set the environment variables DOCKER_REG_URL
+      # DOCKER_REG_ACCT DOCKER_REG_PASS DOCKER_REG_EMAIL appropriately. Running
+      # `docker login` will generate a file with two of those.
+      #
+      def self.authenticate!(registry=nil)
+        registry ||= ENV['DOCKER_REG_URL'] || /.*/
+        creds_hsh = load_credentials(registry)
+        Docker.authenticate!(creds_hsh)
+        creds_hsh
+      end
+
     end
   end
 end
