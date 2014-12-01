@@ -1,3 +1,6 @@
+[submodule "vendor/docker-api"]
+	path = vendor/docker-api
+	url = https://github.com/mrflip/docker-api.git
 [submodule "notes"]
 	path = notes
 	url = https://github.com/mrflip/big_data_for_chimps-code.wiki.git
