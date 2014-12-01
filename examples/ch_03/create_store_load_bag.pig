@@ -13,3 +13,5 @@ team_park_seasons = LOAD './bag_of_park_years.txt' AS (
     team_id:chararray,
     park_years: bag{tuple(year:int, park_id:chararray)}
     );
+
+DESCRIBE team_park_seasons
