@@ -1,4 +1,4 @@
-FROM       bd4c/hadoop_base
+FROM       bd4c/hadoop_base:latest
 MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 
 ENV HADOOP_NN_HOSTNAME solo
@@ -47,28 +47,18 @@ EXPOSE 8042
 EXPOSE 8040
 EXPOSE 8041
 
+COPY img/*/hadoop-setup_*.sh /build/
+
 # Install and configure the namenode
-COPY img/hadoop_nn/hadoop-setup_nn.sh /build/
 RUN         /build/hadoop-setup_nn.sh
 # Install and configure the datanode
-COPY img/hadoop_worker/hadoop-setup_dn.sh /build/
 RUN             /build/hadoop-setup_dn.sh
 # Install and configure the nodemanager
-COPY img/hadoop_worker/hadoop-setup_nm.sh /build/
 RUN             /build/hadoop-setup_nm.sh
 # Install and configure the secondarynamenode
-COPY img/hadoop_snn/hadoop-setup_snn.sh /build/
 RUN          /build/hadoop-setup_snn.sh
 # Install and configure the resourcemanager and historyserver
-COPY img/hadoop_rm/hadoop-setup_rm.sh /build/
 RUN         /build/hadoop-setup_rm.sh
-
-# Config Files
-#
-COPY img/hadoop_base/conf/core-site.xml.mustache   $HADOOP_CONF_DIR/
-COPY img/hadoop_base/conf/hdfs-site.xml.mustache   $HADOOP_CONF_DIR/
-COPY img/hadoop_base/conf/yarn-site.xml.mustache   $HADOOP_CONF_DIR/
-COPY img/hadoop_base/conf/mapred-site.xml.mustache $HADOOP_CONF_DIR/
 
 # Ensures Hadoop directories are happy and permissioned even if we mount something under them.
 COPY img/hadoop_nn/conf/init-hadoop_nn_fixup.sh         /etc/my_init.d/30_hadoop_nn_fixup.sh
@@ -78,27 +68,15 @@ COPY img/hadoop_worker/conf/init-hadoop_worker_fixup.sh /etc/my_init.d/30_hadoop
 
 # Enable the service daemons
 #
-COPY img/hadoop_nn/runit/hadoop_nn-runner.sh /etc/sv/hadoop_nn/run
-COPY img/hadoop_nn/runit/hadoop_nn-logger.sh /etc/sv/hadoop_nn/log/run
-RUN  ln -s /etc/sv/hadoop_nn /etc/service/hadoop_nn
-#
-COPY img/hadoop_worker/runit/hadoop_dn-runner.sh /etc/sv/hadoop_dn/run
-COPY img/hadoop_worker/runit/hadoop_dn-logger.sh /etc/sv/hadoop_dn/log/run
-COPY img/hadoop_worker/runit/hadoop_nm-runner.sh /etc/sv/hadoop_nm/run
-COPY img/hadoop_worker/runit/hadoop_nm-logger.sh /etc/sv/hadoop_nm/log/run
-RUN  ln -s /etc/sv/hadoop_dn /etc/service/hadoop_dn
-RUN  ln -s /etc/sv/hadoop_nm /etc/service/hadoop_nm
-#
-COPY img/hadoop_snn/runit/hadoop_snn-runner.sh /etc/sv/hadoop_snn/run
-COPY img/hadoop_snn/runit/hadoop_snn-logger.sh /etc/sv/hadoop_snn/log/run
-RUN ln -s /etc/sv/hadoop_snn /etc/service/hadoop_snn
-#
-COPY img/hadoop_rm/runit/hadoop_rm-runner.sh   /etc/sv/hadoop_rm/run
-COPY img/hadoop_rm/runit/hadoop_rm-logger.sh   /etc/sv/hadoop_rm/log/run
-COPY img/hadoop_rm/runit/hadoop_hist-runner.sh /etc/sv/hadoop_hist/run
-COPY img/hadoop_rm/runit/hadoop_hist-logger.sh /etc/sv/hadoop_hist/log/run
-RUN  ln -s /etc/sv/hadoop_rm   /etc/service/hadoop_rm
-RUN  ln -s /etc/sv/hadoop_hist /etc/service/hadoop_hist
+COPY img/*/runit /etc/sv/
+
+RUN  \
+  ln -s /etc/sv/hadoop_nn   /etc/service/hadoop_nn  \
+  ln -s /etc/sv/hadoop_dn   /etc/service/hadoop_dn  \
+  ln -s /etc/sv/hadoop_nm   /etc/service/hadoop_nm  \
+  ln -s /etc/sv/hadoop_snn  /etc/service/hadoop_snn \
+  ln -s /etc/sv/hadoop_rm   /etc/service/hadoop_rm  \
+  ln -s /etc/sv/hadoop_hist /etc/service/hadoop_hist
 
 # Format the HDFS and make initial directories
 #

@@ -12,24 +12,23 @@ local:
     baseimage:         { repo_tag: 'phusion/baseimage:0.9.15',           external: true, est_size: '' }
     elasticsearch:     { repo_tag: 'dockerfile/elasticsearch:latest',    external: true, est_size: '' }
     #
-    baseimage:         { repo_tag: 'bd4c/baseimage:latest',  }
-    volume_boxer:      { repo_tag: 'bd4c/volume_boxer:latest',  }
-    # lipstick:          { repo_tag: 'bd4c/lipstick:latest',  }
-    hadoop_base:       { repo_tag: 'tutum.co/mrflip/base:latest',  }
-    hadoop_nn:         { repo_tag: 'tutum.co/mrflip/nn:latest',  }
-    hadoop_rm:         { repo_tag: 'tutum.co/mrflip/rm:latest',  }
-    hadoop_snn:        { repo_tag: 'tutum.co/mrflip/snn:latest',  }
-    hadoop_hue:        { repo_tag: 'tutum.co/mrflip/hue:latest',  }
-    hadoop_worker:     { repo_tag: 'tutum.co/mrflip/worker:latest',  }
-    hadoop_lounge:     { repo_tag: 'tutum.co/mrflip/lounge:latest',  }
+    baseimage:         { repo_tag: 'tutum.co/mrflip/baseimage:latest',  }
+    volume_boxer:      { repo_tag: 'mrflip/volume_boxer:latest',  }
+    # lipstick:        { repo_tag: 'tutum.co/mrflip/lipstick:latest',  }
+    hadoop_base:       { repo_tag: 'tutum.co/mrflip/hadoop_base:latest',  }
+    hadoop_nn:         { repo_tag: 'tutum.co/mrflip/hadoop_nn:latest',  }
+    hadoop_rm:         { repo_tag: 'tutum.co/mrflip/hadoop_rm:latest',  }
+    hadoop_snn:        { repo_tag: 'tutum.co/mrflip/hadoop_snn:latest',  }
+    hadoop_hue:        { repo_tag: 'tutum.co/mrflip/hadoop_hue:latest',  }
+    hadoop_worker:     { repo_tag: 'tutum.co/mrflip/hadoop_worker:latest',  }
+    hadoop_lounge:     { repo_tag: 'tutum.co/mrflip/hadoop_lounge:latest',  }
     #
-    data_gold:         { repo_tag: 'bd4c/data_gold:wip',   'kind': 'data' }
-    data_hdfs0:        { repo_tag: 'bd4c/data_hdfs0:wip',  'kind': 'data' }
-    data_hue:          { repo_tag: 'bd4c/data_hue:wip',    'kind': 'data' }
-    data_nn:           { repo_tag: 'bd4c/data_nn:wip',     'kind': 'data' }
-    data_outd:         { repo_tag: 'bd4c/data_outd:wip',   'kind': 'data' }
-    home_chimpy:       { repo_tag: 'bd4c/home_chimpy:wip', 'kind': 'data' }
-    home_chimpy:       { repo_tag: 'bd4c/home_chimpy:wip', 'kind': 'data' }
+    data_gold:         { repo_tag: 'mrflip/data_gold:latest',   'kind': 'data' }
+    data_hdfs0:        { repo_tag: 'mrflip/data_hdfs0:latest',  'kind': 'data' }
+    data_hue:          { repo_tag: 'mrflip/data_hue:latest',    'kind': 'data' }
+    data_nn:           { repo_tag: 'mrflip/data_nn:latest',     'kind': 'data' }
+    data_outd:         { repo_tag: 'mrflip/data_outd:latest',   'kind': 'data' }
+    home_chimpy:       { repo_tag: 'mrflip/home_chimpy:latest', 'kind': 'data' }
     
   # clusters
   clusters:

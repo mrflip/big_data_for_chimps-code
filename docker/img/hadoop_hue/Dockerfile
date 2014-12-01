@@ -17,7 +17,5 @@ RUN             /build/hadoop-setup_hue.sh
 
 # Copy the hue config scripts and enable the servise
 #
-COPY img/hadoop_hue/runit/hadoop_hue-runner.sh /etc/sv/hadoop_hue/run
-COPY img/hadoop_hue/runit/hadoop_hue-logger.sh /etc/sv/hadoop_hue/log/run
-#
+COPY img/hadoop_hue/runit /etc/sv
 RUN  ln -s /etc/sv/hadoop_hue /etc/service/hadoop_hue

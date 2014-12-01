@@ -47,8 +47,9 @@ COPY img/hadoop_base/conf/*.xml.mustache   $HADOOP_CONF_DIR/
 # Update configs on each container start
 COPY img/hadoop_base/conf/mustache_rider.sh  /etc/my_init.d/50_hadoop_mustache_rider.sh
 
-RUN /etc/my_init.d/50_hadoop_mustache_rider.sh
-RUN colordiff -uw $HADOOP_CONF_DIR/core-site.xml.mustache $HADOOP_CONF_DIR/core-site.xml ; true
+RUN \
+  /etc/my_init.d/50_hadoop_mustache_rider.sh && \
+  ls -lR $HADOOP_CONF_DIR $HADOOP_LOG_DIR /build
 
 # TODO figure this out
 # ONBUILD RUN img/baseimage/cleanup.sh

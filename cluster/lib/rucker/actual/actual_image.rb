@@ -24,7 +24,7 @@ module Rucker
       end
 
       def has_repo_tag?(repo_tag, tag=nil)
-        repo_tags.include?([repo_tag, tag].compact.join(':'))
+        repo_tags.include?([repo_tag, tag].compact.join(':')) rescue false
       end
 
       # @return [Time] Creation time of this image

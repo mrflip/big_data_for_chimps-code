@@ -82,6 +82,20 @@ module Rucker
         end
       end
 
+      # note that a manifest object is not created for the new image, let alone
+      # added to the world manifest.
+      def add_tag(opts={})
+        rt = self.adjusted_name(opts.slice(:reg, :repo, :tag))
+        #
+        if actual.has_repo_tag?(rt[:repo_tag])
+          Rucker.progress(:tagging, self, with: rt[:repo_tag], skipped: "repo_tag #{rt[:repo_tag]} already present")
+          return true
+        end
+        Rucker.progress(:tagging, self, with: rt[:repo_tag])
+        actual.tag(repo: rt[:family], tag: rt[:tag])
+        true
+      end
+
       def _pull(opts={})
         rt = self.adjusted_name(opts.slice(:reg, :repo, :tag))
         #
@@ -216,25 +230,6 @@ module Rucker
         end
       end
 
-      # note that a manifest object is not created for the new image, let alone
-      # added to the world manifest.
-      def add_tag(new_repo_tag)
-        case new_repo_tag
-        when %r{:} then new_family, new_tag = new_repo_tag.to_s.split(/:/, 2)
-        when %r{/} then new_family, new_tag = [new_repo_tag, 'latest']
-        else            new_family, new_tag = [family, new_repo_tag]
-        end
-        new_repo_tag = [new_family, new_tag].join(':')
-        #
-        if actual.has_repo_tag?(new_repo_tag)
-          Rucker.progress(:tagging, self, with: new_repo_tag, skipped: "repo_tag #{new_repo_tag} already present")
-          return true
-        end
-        Rucker.progress(:tagging, self, with: new_repo_tag)
-        actual.tag(repo: new_family, tag: new_tag)
-        true
-      end
-
       def _remove
         Rucker.progress(:removing, self)
         actual.untag(self.repo_tag)
@@ -360,40 +355,77 @@ module Rucker
       def ready?() items.all?(&:ready?) ; end
       def clear?() items.all?(&:clear?) ; end
 
+
       ::Rucker.module_eval do
-        def self.parallelize(coll, num_threads, mutex, &callback)
+        def self.parallelize(coll, operation, num_threads, mutex, opts, &callback)
           mutex.synchronize do
             results = { }
             errors  = { }
-            coll.each_pair.each_slice(num_threads) do |tasks|
-              img_threads = tasks.map do |key, img|
-                thr = Thread.new{
+            tasks = coll.to_hash.to_a
+            img_threads = num_threads.times.map do |worker_idx|
+              thr = Thread.new{
+                10.times do
                   begin
-                    callback.call(key, img)
+                    key, img = tasks.pop
+                    puts "#{worker_idx} beg: #{[key, img]} -- #{tasks.map(&:first)}"
+                    results[key] = callback.call(key, img)
+                    puts "#{worker_idx} fin: #{[key, results[key]]} -- #{tasks.map(&:first)}"
                   rescue StandardError => err
-                    Rucker.progress(:pushed, img, error: err.message)
+                    Rucker.progress(operation, img, error: err.message)
                     errors[key] = err
                   end
-                }
-                [key, thr]
-              end
-              img_threads.each do |key, thr|
-                thr.join
-              end
-              if errors.present?
-                err = Rucker::Error::ParallelError.with_errors(errors)
-                raise err
-              end
+                  break if errors.present? && (not opts[:ignore_failure])
+                end
+              }
             end
-            results
+            img_threads.each_with_index do |thr, idx|
+              thr.join
+              Rucker.progress(operation, "worker_#{idx}", task: 'complete')
+            end
+            if errors.present? && (not opts[:ignore_failure])
+              err = Rucker::Error::ParallelError.with_errors(errors)
+              raise err
+            end
+            [results, errors]
           end
         end
       end
 
+      # ::Rucker.module_eval do
+      #   def self.parallelize(coll, operation, num_threads, mutex, opts, &callback)
+      #     mutex.synchronize do
+      #       results = { }
+      #       errors  = { }
+      #       coll.each_pair.each_slice(num_threads) do |tasks|
+      #         img_threads = tasks.map do |key, img|
+      #           thr = Thread.new{
+      #             begin
+      #               results[key] = callback.call(key, img)
+      #             rescue StandardError => err
+      #               Rucker.progress(operation, img, error: err.message)
+      #               errors[key] = err
+      #             end
+      #           }
+      #           [key, thr]
+      #         end
+      #         img_threads.each do |key, thr|
+      #           thr.join
+      #           Rucker.progress(operation, key, task: 'complete')
+      #         end
+      #         if errors.present? && (not opts[:ignore_failure])
+      #           err = Rucker::Error::ParallelError.with_errors(errors)
+      #           raise err
+      #         end
+      #       end
+      #       [results, errors]
+      #     end
+      #   end
+      # end
+
       @@push_pull_mutex ||= Mutex.new
 
       def pull_all(opts={})
-        Rucker.parallelize(self, 4, @@push_pull_mutex) do |key, img|
+        Rucker.parallelize(self, :pulled, 3, @@push_pull_mutex, opts) do |key, img|
           img._pull(opts)
           img.refresh!
         end
@@ -401,7 +433,7 @@ module Rucker
 
       def push_all(opts={})
         imgs_to_push = select_coll(&:ours?)
-        Rucker.parallelize(imgs_to_push, 4, @@push_pull_mutex) do |key, img|
+        Rucker.parallelize(imgs_to_push, :pushed, 3, @@push_pull_mutex, opts) do |key, img|
           img._push(opts)
         end
       end

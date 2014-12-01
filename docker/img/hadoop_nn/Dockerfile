@@ -16,10 +16,12 @@ COPY img/hadoop_nn/conf/init-hadoop_nn_fixup.sh /etc/my_init.d/30_hadoop_nn_fixu
 
 # Enable the service daemons
 #
-COPY img/hadoop_nn/runit/hadoop_nn-runner.sh /etc/sv/hadoop_nn/run
-COPY img/hadoop_nn/runit/hadoop_nn-logger.sh /etc/sv/hadoop_nn/log/run
-#
-RUN  ln -s /etc/sv/hadoop_nn /etc/service/hadoop_nn
+COPY img/hadoop_nn/runit /etc/sv
+RUN  \
+  ls -lR /etc/sv  ; \
+  ln -s /etc/sv/hadoop_nn /etc/service/hadoop_nn ; \
+  ls -lR /etc/sv /etc/service ; \
+  ls -l /etc/hadoop/conf/*.xml*
 
 # Format the HDFS and make initial directories
 #

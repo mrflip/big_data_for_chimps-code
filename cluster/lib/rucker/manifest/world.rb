@@ -129,11 +129,12 @@ module Rucker
         #
         #
         def authenticate!(registry)
-          registry = registry.to_s
-          creds_hsh = credentials[registry] or raise "No credentials for '#{registry}' present in loaded credentials: #{creds_list.keys}"
-          return creds_hsh if creds_hsh[:docker_str].present?
-          #
+          creds_hsh = nil
           @authentication_mutex.synchronize do
+            registry = registry.to_s
+            creds_hsh = credentials[registry] or raise "No credentials for '#{registry}' present in loaded credentials: #{creds_list.keys}"
+            return creds_hsh if creds_hsh[:docker_str].present?
+            #
             Rucker.progress(:authing, self, to: registry)
             Docker.authenticate!(creds_hsh)
             creds_hsh[:docker_str] = Docker.creds

@@ -40,7 +40,7 @@ module Rucker
     # other
     with:     :mag, to:       :mag, from: :mag,
     # alertness
-    note:     :red, danger:   :brr, error: :brr
+    note:     :red, danger:   :brr, error: :brr, success: :brg,
   }
   # completed actions represent mild change
   %w[added created pulled pushed tagged removed

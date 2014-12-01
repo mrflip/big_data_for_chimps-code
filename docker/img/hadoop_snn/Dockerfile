@@ -17,7 +17,5 @@ COPY img/hadoop_snn/conf/init-hadoop_snn_fixup.sh /etc/my_init.d/30_hadoop_snn_f
 
 # Enable the service daemons
 #
-COPY img/hadoop_snn/runit/hadoop_snn-runner.sh /etc/sv/hadoop_snn/run
-COPY img/hadoop_snn/runit/hadoop_snn-logger.sh /etc/sv/hadoop_snn/log/run
-#
+COPY img/hadoop_snn/runit   /etc/sv
 RUN ln -s /etc/sv/hadoop_snn /etc/service/hadoop_snn

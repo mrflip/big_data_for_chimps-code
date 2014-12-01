@@ -25,7 +25,6 @@ COPY img/hadoop_jt/conf/init-hadoop_jt_fixup.sh /etc/my_init.d/30_hadoop_jt_fixu
 
 # Enable the service daemons
 #
-COPY img/hadoop_jt/runit/hadoop_jt-runner.sh   /etc/sv/hadoop_jt/run
-COPY img/hadoop_jt/runit/hadoop_jt-logger.sh   /etc/sv/hadoop_jt/log/run
+COPY img/hadoop_jt/runit /etc/sv
 #
 RUN  ln -s /etc/sv/hadoop_jt   /etc/service/hadoop_jt
