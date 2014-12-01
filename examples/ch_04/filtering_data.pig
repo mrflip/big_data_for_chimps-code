@@ -15,10 +15,10 @@ modern_bats = FILTER bats BY (year_id >= 1900);
 
 -- Load a summary of batting per player per season
 bat_seasons = LOAD '/data/gold/sports/baseball/bat_seasons.tsv' USING PigStorage('\t') AS (
-  player_id:chararray, name_first:chararray, name_last:chararray,     --  $0- $2
-  year_id:int,        team_id:chararray,     lg_id:chararray,         --  $3- $5
-  age:int,  G:int,    PA:int,   AB:int,  HBP:int,  SH:int,   BB:int,  --  $6-$12
-  H:int,    h1B:int,  h2B:int,  h3B:int, HR:int,   R:int,    RBI:int  -- $13-$19
+    player_id:chararray, name_first:chararray, name_last:chararray,     --  $0- $2
+    year_id:int,        team_id:chararray,     lg_id:chararray,         --  $3- $5
+    age:int,  G:int,    PA:int,   AB:int,  HBP:int,  SH:int,   BB:int,  --  $6-$12
+    H:int,    h1B:int,  h2B:int,  h3B:int, HR:int,   R:int,    RBI:int  -- $13-$19
 );
 
 -- Modern era, American or National Leagues
@@ -41,4 +41,19 @@ people = LOAD '/data/gold/sports/baseball/people.tsv' USING PigStorage('\t') AS 
 
 -- People with known birth year/place
 borned = FILTER people BY (birth_year IS NOT NULL) AND (birth_place IS NOT NULL);
+
+-- Look for players with our co-author's names
+namesakes = FILTER people BY (name_first MATCHES '(?i).*(russ|russell|flip|phil+ip).*');
+
+-- Look for players who's names start with a lowercase or non-word, non-space character
+funnychars = FILTER people BY (name_first MATCHES '^([^A-Z]|.*[^\\w\\s]).*');
+
+-- Load data about ball parks and the teams that occupied them
+park_team_years = LOAD '/data/gold/sports/baseball/park_team_years.tsv' USING PigStorage('\t') AS (
+    park_id:chararray, team_id:chararray, year_id:long, beg_date:chararray, end_date:chararray, n_games:long
+);
+
+-- Filter to just American League eastern division teams
+al_east_parks = FILTER park_team_years BY
+  team_id IN ('BAL', 'BOS', 'CLE', 'DET', 'ML4', 'NYA', 'TBA', 'TOR', 'WS2');
 
