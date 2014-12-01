@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+begin  require 'bundler' ;
+rescue LoadError => err ; abort "The bundler gem is not installed: #{err}; check the README.md\nWithin the #{File.dirname(__FILE__)} directory, run\n'gem install bundler', then 'bundle install', and try again."
+end
+
+Bundler.require(:default, :docker)
+require_relative '../cluster/lib/rucker'
+#
+Rucker.config.parse_argv!
+
+# Configliere TODOs
+#
+# * commandline resolution should strip argv (?optionally or always?)
+# * commandline resolution should prepare a hash that other things can choose to receive
+# * type pathname, type string
+# * resolve, at all
+# * true value provided on --string_opt (rather than error)
+# * define foo_bar should accept --foo-bar
+# * warn on undefined params (?optionally?)
+
+Rake.application.run

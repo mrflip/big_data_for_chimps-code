@@ -1,9 +1,9 @@
 #!/bin/bash
-set -e ; set -v
+set -e ; set -x
 
 # Hadoop Hue -- pretty front-end to hadoop
 #
-$safe_apt_install hue
+$safe_apt_install hue-common hue-plugins hue-server
 
 mkdir -p        $HADOOP_LOG_DIR/hue-app
 ln -snf         $HADOOP_LOG_DIR/hue-app  /var/log/hue

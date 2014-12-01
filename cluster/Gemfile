@@ -5,8 +5,13 @@ gem 'gorillib',  "~> 0.6"
 gem 'pry',       "~> 0.10"
 
 gem 'multi_json', ">= 1.1"
+gem 'configliere', ">= 0.4.22"
 
 group :docker do
   gem 'childprocess'
   gem 'docker-api', :require => 'docker', :github => 'mrflip/docker-api', :branch => 'master'
+end
+
+group :tutum do
+  gem 'tutum',  :require => 'tutum', :github => 'tutumcloud/ruby-tutum', :branch => 'master'
 end

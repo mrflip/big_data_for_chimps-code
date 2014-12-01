@@ -9,7 +9,7 @@ module Rucker
       field :est_size,    :string,  doc: 'An advisory statement of the actual image size.'
       #
       accessor_field :actual, Rucker::Actual::ActualImage, writer: true
-      protected :actual
+      # protected :actual
       accessor_field :parsed_repo_tag
       #
       class_attribute :max_retries; self.max_retries = 10
@@ -18,8 +18,8 @@ module Rucker
       # `library/debian:jessie` are currently identical.
       #
       # @see Rucker::Actual::ActualImage#repo_tags
-      # @return [Array[String]] All repo_tag names that apply to this image
-      def aliases()      actual.try(:repo_tags) || [] ; end
+      # @return [Array[String]] All repo_tag that have the same final layer as this image
+      def repo_tags()  actual.try(:repo_tags) || [] ; end
 
       # @see Rucker::Actual::ActualImage#id
       # @return [String] ID for this image as a long hexadecimal string
@@ -35,9 +35,11 @@ module Rucker
       # @return [Integer] Size of all layers that comprise this image
       def size()       actual.try(:size) ; end
 
-      def ours?() not external? ; end
-
+      def ours?()     not external? ; end
       def external?() !! external ; end
+
+      def data?()     kind == :data ; end
+      def non_data?() not data? ; end
 
       def readable_size()
         "%4d %2s" % Rucker.bytes_to_human(size) rescue ''
@@ -80,24 +82,100 @@ module Rucker
         end
       end
 
-      def _pull(registry, opts={})
-        Rucker.progress(:pulling, self, note: "This can take a really long time.")
-        creds_hsh = Rucker::Manifest::World.authenticate!(registry)
+      def _pull(opts={})
+        rt = self.adjusted_name(opts.slice(:reg, :repo, :tag))
         #
-        actual = Rucker::Actual::ActualImage.pull_using_manifest(self)
+        creds = Rucker::Manifest::World.authenticate!(rt[:registry])
+        p [rt, creds]
+        #
+        Rucker.progress(:pulling, self, from: rt[:repo_tag], as: self.repo_tag, note: "This can take a really long time.")
+        actual = Rucker::Actual::ActualImage.pull_by_name(
+          rt[:registry], rt[:family], rt[:tag], creds[:docker_str],
+          &method(:interpret_chunk))
+        #
+        unless (rt[:repo_tag] == self.repo_tag) || actual.has_repo_tag?(self.repo_tag)
+          Rucker.progress(:tagging, rt[:repo_tag], as: self.repo_tag)
+          actual.tag(repo: self.family, tag: self.tag)
+        end
         forget()
         true
       end
 
-      def _push(registry, opts={})
-        Rucker.progress(:pushing, self, note: "This can take a really long time.")
-        creds_hsh = Rucker::Manifest::World.authenticate!(registry)
+      def push(repo_tag=nil)
+        if repo_tag.present?
+          name_hsh = Docker.parse_reg_repo_tag(repo_tag)
+        else
+          name_hsh = self.parsed_repo_tag
+        end
+        _push(name_hsh.slice(:reg, :repo, :slug, :tag))
+      end
+
+      #
+      # You can independently override the :reg, :repo, :slug or :tag so
+      # that you can bulk push to a different registry; a different account; or
+      # with a new versioned tag. (I can't think of why you'd want to bulk-apply
+      # the :slug, but you can.
+      #
+      # Note that {reg: nil} will override the object's registry to mean
+      # whereas omitting a key for `:reg` means use the object's registry
+      def _push(opts={})
+        opts = opts.dup
+        rt = self.adjusted_name(opts.extract!(:reg, :repo, :slug, :tag))
         #
-        push_repo_tag = creds_hsh
-        actual.push(Docker.creds, opts, &method(:interpret_chunk))
+        creds = Rucker::Manifest::World.authenticate!(rt[:registry])
+        #
+        Rucker.progress(:pushing, self, as: rt[:repo_tag], to: rt[:registry], note: "This can take a really long time.")
+        actual.push(creds[:docker_str], opts.merge(repo_tag: rt[:repo_tag]), &method(:interpret_chunk))
         #
         forget()
         true
+      end
+
+      # Given a hash with :reg, :repo, :slug and :tag, returns a hash with all
+      # values of known type and applied defaults:
+      #
+      # * :repo     the stringified value if present; nil if blank
+      # * :slug     the stringified value if present; raises an error if blank
+      # * :tag      the stringified value if present, 'latest' if blank
+      #
+      # If default docker.io registry was implied -- by a reg key that was
+      # empty, missing, or contained 'docker.io' within it -- then
+      #
+      # * :reg       nil
+      # * :registry  'index.docker.io'
+      # * :family    'repo/slug'
+      # * :repo_tag  'repo/slug:tag'
+      #
+      # Otherwise a registry was named, and the following are set:
+      #
+      # * :reg      stringified registry name
+      # * :registry stringified registry name
+      # * :family   'reg/repo/slug'
+      # * :repo_tag 'reg/repo/slug:tag'
+      #
+      # You can supply values for :registry,
+      #
+      def adjusted_name(in_hsh)
+        hsh = in_hsh.
+          slice(:reg, :repo, :slug, :tag).
+          reverse_merge(self.parsed_repo_tag)
+        #
+        hsh[:slug] = hsh[:slug].to_s
+        raise ArgumentError, "Slug cannot be blank" if hsh[:slug].blank?
+        hsh[:repo] = hsh[:repo].present? ? hsh[:repo].to_s : nil
+        hsh[:tag] = hsh[:tag].present?   ? hsh[:tag].to_s  : 'latest'
+        #
+        if (hsh[:reg].blank?) || (/docker.io/ === hsh[:reg])
+          hsh[:reg]      = nil
+          hsh[:registry] = 'index.docker.io'
+          hsh[:family]   = "#{hsh[:repo]}/#{hsh[:slug]}"
+        else
+          hsh[:reg]      = hsh[:reg].to_s
+          hsh[:registry] = hsh[:reg]
+          hsh[:family]   = "#{hsh[:reg]}/#{hsh[:repo]}/#{hsh[:slug]}"
+        end
+        hsh[:repo_tag]   = "#{hsh[:family]}:#{hsh[:tag]}"
+        hsh
       end
 
       PROGRESS_BAR_RE = %r{\[([^\]])\] ([\d\.]+) (\w\w)/([\d\.]+) (\w\w) (\w+)}
@@ -106,48 +184,60 @@ module Rucker
       def interpret_chunk(step)
         case step['status']
         when /^(Pushing|Pulling) repository ([^\s]+)(?: \((\d+) tags\))?/
-          Rucker.progress(($1.downcase.to_sym), self, as: $2)
+          Rucker.progress(($1.downcase.to_sym), self, from: $2)
         when /^Pulling image \((.*)\) from (.*)/
           Rucker.progress(:downloading, self, layer: step['id'], from: $2)
         when /Sending image list/
           Rucker.progress(:preparing, self, as: 'list of layers')
         when /^(Pushing|Downloading)\z/
-          if step['progress'] && (rand < PROGRESS_MUTING)
-            Rucker.progress(:bored_now, self, progress: step['progress'])
+          if step['progress']
+            Rucker.progress(:bored_now, self, progress: step['progress'], mute: PROGRESS_MUTING)
           end
         when /^Buffering|The push refers to a repository|Pulling metadata|Pulling fs layer|Pulling dependent layers/
           # pass
-        when /^Image ([^ ]*) ?already pushed, skipping/
-          Rucker.progress(:sending, self, layer: $1 || step['id'], skipped: 'layer already pushed')
+        when /^Extracting|The image you are pulling has been verified/
+          # pass
+        when /^Image (?:([^ ]+) )?already pushed, skipping/
+          Rucker.progress(:sending, self, layer: step['id'] || $1 || step.to_s,
+            skipped: 'layer already pushed', mute: 0.1)
+        when /^Already exists/
+          Rucker.progress(:downloaded, self, layer: step['id'] || step.to_s,
+            skipped: 'layer already exists', mute: 1.0)
         when /^Image successfully pushed/
           Rucker.progress(:sent,    self, layer: step['id'])
-        when /^Download complete/
-          Rucker.progress(:downloaded, self, layer: step['id'])
+        when /^(Download|Pull) complete/
+          Rucker.progress(("#{$1}ed".downcase.to_sym), self, layer: step['id'])
         when /^Pushing tag for rev \[([^\]]+)\] on \{([^\}]+)/
           Rucker.progress(:tagged,  self, layer: $1, as: $2)
         when /^Status: (Downloaded newer image|Image is up to date) for (.+)/
           Rucker.progress(:pulled,  self)
         else
-          Rucker.progress(:in_pushing, self, step: step.inspect)
+          Rucker.progress(:unknown, self, step: step.inspect)
         end
       end
 
-      # note that a manifest object is not created for the new image, and
-      # nothing is added to the world.
-      def add_repo_tag(new_repo_tag)
+      # note that a manifest object is not created for the new image, let alone
+      # added to the world manifest.
+      def add_tag(new_repo_tag)
+        case new_repo_tag
+        when %r{:} then new_family, new_tag = new_repo_tag.to_s.split(/:/, 2)
+        when %r{/} then new_family, new_tag = [new_repo_tag, 'latest']
+        else            new_family, new_tag = [family, new_repo_tag]
+        end
+        new_repo_tag = [new_family, new_tag].join(':')
+        #
         if actual.has_repo_tag?(new_repo_tag)
-          Rucker.progress(:tagging, self, with: new_repo_tag, skipped: "tag #{new_repo_tag} already present")
+          Rucker.progress(:tagging, self, with: new_repo_tag, skipped: "repo_tag #{new_repo_tag} already present")
           return true
         end
-        new_family, new_tag = new_repo_tag.split(/:/, 2)
-        Rucker.progress(:tagging, self, with: "#{new_family}:#{new_tag}")
+        Rucker.progress(:tagging, self, with: new_repo_tag)
         actual.tag(repo: new_family, tag: new_tag)
         true
       end
 
       def _remove
         Rucker.progress(:removing, self)
-        actual.remove_using_manifest(self)
+        actual.untag(self.repo_tag)
         forget()
         self.actual = nil
         true
@@ -216,34 +306,26 @@ module Rucker
         @parsed_repo_tag ||= Docker::Util.parse_reg_repo_tag(repo_tag)
       end
 
+      def receive_repo_tag(val)
+        self.repo_tag = super(val)
+      end
+      def repo_tag=(val)
+        val = "#{val}:latest" unless /:/ === val
+        unset_parsed_repo_tag
+        @repo_tag = val.to_s
+      end
+
       def repo()     parsed_repo_tag[:repo]   ; end
       def slug()     parsed_repo_tag[:slug]   ; end
-      def tag()      parsed_repo_tag[:tag]    ; end
+      def tag()      parsed_repo_tag[:tag]   || 'latest' ; end
       def family()   parsed_repo_tag[:family] ; end
-      def path()     parsed_repo_tag[:path]   ; end
 
-
-      # @see #registry if you want to know where to eg invoke credentials
-      def reg()      parsed_repo_tag[:reg]    || self.class.default_registry ; end
-
-      # As far as I can tell, the only way to specify the docker.io registry is
-      # to specify no registry, and the empty registry is always
-      # 'index.docker.io'. Ugh.
-      def registry()
-        reg.present? ? reg : 'index.docker.io'
-      end
+      #
+      def registry() parsed_repo_tag[:reg].blank? ? 'index.docker.io' : parsed_repo_tag[:reg] ; end
 
       # @see Rucker.repo_tag_order
       # @example images.items.sort_by(&:repo_tag_order)
       def repo_tag_order() Rucker.repo_tag_order(name) ; end
-
-      def self.normalize_repo_tag(repo_tag)
-        parsed = Docker::Util.parse_reg_repo_tag(repo_tag)
-        reg  = (parsed[:registry] || default_registry)
-        repo = (parsed[:repo]     || default_repo)
-        tag  = (parsed[:tag]      || default_tag)
-        [reg, '/', rep, parsed[:slug], ':', tag ].join
-      end
 
       def to_wire(*)
         super
@@ -255,32 +337,86 @@ module Rucker
     class ImageCollection < Rucker::KeyedCollection
       self.item_type = Rucker::Manifest::Image
 
+      def desc
+        str = (item_type.try(:type_name) || 'Item')+'s'
+        str << ' in ' << belongs_to.desc if belongs_to.respond_to?(:desc)
+        str
+      end
+
       #
       # Actions
       #
 
-      def ready(*args) map{|item| item.ready }.all? ; end
-      def clear(*args) map{|item| item.clear }.all? ; end
+      def ready(*args)
+        return true if ready?
+        absentees = select_coll(&:absent?)
+        absentees.pull_all
+      end
 
-      def push
-        results = { }
-        img_threads = clxn.map do |key, img|
-          Thread.new{
-            results[key] = img._push
-          }
+      def state
+        map(&:state).uniq.compact
+      end
+      #
+      def ready?() items.all?(&:ready?) ; end
+      def clear?() items.all?(&:clear?) ; end
+
+      ::Rucker.module_eval do
+        def self.parallelize(coll, num_threads, mutex, &callback)
+          mutex.synchronize do
+            results = { }
+            errors  = { }
+            coll.each_pair.each_slice(num_threads) do |tasks|
+              img_threads = tasks.map do |key, img|
+                thr = Thread.new{
+                  begin
+                    callback.call(key, img)
+                  rescue StandardError => err
+                    Rucker.progress(:pushed, img, error: err.message)
+                    errors[key] = err
+                  end
+                }
+                [key, thr]
+              end
+              img_threads.each do |key, thr|
+                thr.join
+              end
+              if errors.present?
+                err = Rucker::Error::ParallelError.with_errors(errors)
+                raise err
+              end
+            end
+            results
+          end
         end
-        img_threads.each{|thr| thr.join }
-        results
+      end
+
+      @@push_pull_mutex ||= Mutex.new
+
+      def pull_all(opts={})
+        Rucker.parallelize(self, 4, @@push_pull_mutex) do |key, img|
+          img._pull(opts)
+          img.refresh!
+        end
+      end
+
+      def push_all(opts={})
+        imgs_to_push = select_coll(&:ours?)
+        Rucker.parallelize(imgs_to_push, 4, @@push_pull_mutex) do |key, img|
+          img._push(opts)
+        end
       end
 
       #
       # Slicing
       #
 
-      # collection of images with given family, sorted by tag (with tag 'latest' first)
+      # collection of images with given family, sorted by value
+      # @see
       def select_coll(&blk)
         coll = new_empty_collection
-        clxn.each_value{|item| coll.add(item) if yield(item) }
+        clxn.values.
+          sort_by(&:repo_tag_order).
+          each{|item| coll.add(item) if yield(item) }
         coll
       end
 
@@ -297,7 +433,7 @@ module Rucker
           actual.repo_tags.each do |rt|
             items.each do |img|
               # dup, because two handles might point to same repo_tag.
-              img.actual = actual.dup if img.repo_tag == rt
+              img.send(:actual=, actual.dup) if img.repo_tag == rt
             end
           end
         end

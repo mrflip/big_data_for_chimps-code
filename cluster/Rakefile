@@ -1,5 +1,4 @@
-#!/usr/bin/env rake -f
-begin require 'bundler' ;
+begin  require 'bundler' ;
 rescue LoadError => err ; abort "The bundler gem is not installed: #{err}; check the README.md\nWithin the #{File.dirname(__FILE__)} directory, run\n'gem install bundler', then 'bundle install', and try again."
 end
 
@@ -7,10 +6,12 @@ Bundler.require(:default, :docker)
 require_relative '../cluster/lib/rucker'
 require_relative '../cluster/lib/rucker/utils/rake_utils'
 include Rucker::RakeUtils
+
 Pathname.register_paths({ cluster_layout: './rucker.yaml' })
 if (ENV['DOCKER_HOST'].blank? && ENV['NO_DOCKER_HOST'].blank?) then warn "No DOCKER_HOST environment variable is set. \nIf you see errors about socks, that's why. \nBoot2docker users should run 'boot2docker up' and follow the instructions given. \nSet the NO_DOCKER_HOST environment variable to make this warning go away.\n\n" ; end
 
 RUCKER_VERBOSE = !! ENV['VERBOSE']
+
 
 desc "Show detailed status of the docker server and current world"
 task :info do
@@ -356,3 +357,4 @@ end
 task :default do
   abort "Please specify a task name, like 'rake ps' or 'rake up'.\nTo see the list of tasks, run 'rake -T'.\nFor more help, run 'rake --help'."
 end
+

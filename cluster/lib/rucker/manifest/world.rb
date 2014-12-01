@@ -11,6 +11,7 @@ module Rucker
       collection :images,      Rucker::Manifest::ImageCollection
       collection :extra_ports, Rucker::Manifest::PortBindingCollection
 
+
       # Loads the chosen world from the layout yaml file
       # @return Rucker::Manifest::World
       def self.load(layout_file, name)
@@ -18,7 +19,7 @@ module Rucker
         world_layout = layout[name.to_s]
         world_layout['layout_file'] = layout_file
         world_layout['clusters'] = world_layout['clusters'].map do |cl_name, ctrs|
-          { world: self, name: cl_name, containers: ctrs }
+          { name: cl_name, containers: ctrs }
         end
         world_layout['name'] = name
         receive(world_layout).refresh!
@@ -36,10 +37,10 @@ module Rucker
       # Actions
       #
 
-      def up?()    clusters.all?(&:up?)    ; end
-      def ready?() clusters.all?(&:ready?) ; end
-      def down?()  clusters.all?(&:down?)  ; end
-      def clear?() clusters.all?(&:clear?) ; end
+      def up?()    clusters.items.all?(&:up?)    ; end
+      def ready?() clusters.items.all?(&:ready?) ; end
+      def down?()  clusters.items.all?(&:down?)  ; end
+      def clear?() clusters.items.all?(&:clear?) ; end
 
       def up(*args)    clusters.each{|cl|               cl.up(*args)    } ; end
       def ready(*args) clusters.each{|cl|               cl.ready(*args) } ; end
@@ -96,29 +97,49 @@ module Rucker
         clusters.map{|cl| cl.state }.flatten.uniq.sort
       end
 
-      def self.load_credentials(registry)
-        docker_creds = File.expand_path(ENV['DOCKER_CREDENTIALS'] || '~/.docker_credentials')
-        raise "docker credentials file doesn't exist" if not File.exists?(docker_creds)
-        #
-        creds_list = MultiJson.load(File.read(docker_creds))
-        serveraddress = creds_list.keys.grep(registry).first
-        creds = creds_list[serveraddress] or raise "No credentials for '#{registry}' present in #{creds_list.keys}"
-        creds['serveraddress'] ||= serveraddress
-        return creds
-      rescue StandardError => err
-        raise err.class, "Could not load credentials from #{docker_creds}: #{err.message}. Run 'docker login', then set $DOCKER_CREDENTIALS to the file it creates, and $DOCKER_REG_ACCT / $DOCKER_REG_PASS to the registry username we should apply.", err.backtrace
-      end
+      @authentication_mutex = Mutex.new
 
-      #
-      # To use this, Set the environment variables DOCKER_REG_URL
-      # DOCKER_REG_ACCT DOCKER_REG_PASS DOCKER_REG_EMAIL appropriately. Running
-      # `docker login` will generate a file with two of those.
-      #
-      def self.authenticate!(registry=nil)
-        registry ||= ENV['DOCKER_REG_URL'] || /.*/
-        creds_hsh = load_credentials(registry)
-        Docker.authenticate!(creds_hsh)
-        creds_hsh
+      class << self
+        def credentials()
+          return @credentials if instance_variable_defined?(:@credentials)
+          docker_creds = File.expand_path(ENV['DOCKER_CREDENTIALS'] || '~/.docker_credentials')
+          raise "docker credentials file doesn't exist" if not File.exists?(docker_creds)
+          #
+          @credentials = MultiJson.load(File.read(docker_creds))
+          @credentials
+        rescue StandardError => err
+          raise err.class, "Could not load credentials from #{docker_creds}: #{err.message}.", err.backtrace
+        end
+        protected :credentials
+
+        def unset_credentials
+          remove_instance_variable(:@credentials) if instance_variable_defined?(:@credentials)
+        end
+
+        #
+        # To use this, create a JSON file named '$HOME/.docker_credentials'
+        # with the following structure:
+        #
+        #      { "index.docker.io":{
+        #        "serveraddress":"https://index.docker.io/v1/",
+        #        "username":"bob",
+        #        "email":"bob@dobbs.com",
+        #        "password":"monkey"}
+        #      }
+        #
+        #
+        def authenticate!(registry)
+          registry = registry.to_s
+          creds_hsh = credentials[registry] or raise "No credentials for '#{registry}' present in loaded credentials: #{creds_list.keys}"
+          return creds_hsh if creds_hsh[:docker_str].present?
+          #
+          @authentication_mutex.synchronize do
+            Rucker.progress(:authing, self, to: registry)
+            Docker.authenticate!(creds_hsh)
+            creds_hsh[:docker_str] = Docker.creds
+          end
+          creds_hsh
+        end
       end
 
     end

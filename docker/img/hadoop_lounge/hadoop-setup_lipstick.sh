@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e ; set -v ; date
+set -x ; set -e ; date
 
 #
 # Lipstick

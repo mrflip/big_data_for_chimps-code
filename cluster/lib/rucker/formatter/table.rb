@@ -261,19 +261,15 @@ module Rucker
   end
 
   module Actual
-    module Common
-      def forget_ivars(*names)
-        names.each do |name|
-          remove_instance_variable(name) if instance_variable_defined?(name)
-        end
-      end
-    end
 
     # def dump_docker_envvars
     #
     # end
     class DockerServer
-      include Rucker::Actual::Common
+      include Gorillib::AccessorFields
+
+      accessor_field :docker_info
+      accessor_field :version_info
 
       def docker_info
         @docker_info ||= Docker.info
@@ -282,7 +278,8 @@ module Rucker
         @version_info ||= Docker.version
       end
       def forget()
-        forget_ivars(:@docker_info, :@version_info)
+        unset_docker_info
+        unset_version_info
       end
       def url
         Docker.url

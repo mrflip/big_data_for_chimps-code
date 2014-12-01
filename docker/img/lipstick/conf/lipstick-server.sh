@@ -1,6 +1,5 @@
 #!/bin/bash
-
-set -v ; set -e
+set -x ; set -e ; date
 
 
 cat > /etc/lipstick.properties <<EOF

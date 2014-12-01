@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e ; set -v
+set -x ; set -e ; date
 
 #
 # Pig

@@ -8,6 +8,15 @@ GIT
       excon (>= 0.38.0)
       json
 
+GIT
+  remote: git://github.com/tutumcloud/ruby-tutum.git
+  revision: fcc47826e892e43b970372898d90eff5e82b362e
+  branch: master
+  specs:
+    tutum (0.2.2)
+      json (~> 1.8.1)
+      rest-client (~> 1.7.2)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -26,12 +35,17 @@ GEM
     highline (1.5.2)
     json (1.8.1)
     method_source (0.8.2)
+    mime-types (2.4.3)
     multi_json (1.10.1)
+    netrc (0.8.0)
     pry (0.10.1)
       coderay (~> 1.1.0)
       method_source (~> 0.8.1)
       slop (~> 3.4)
     rake (10.4.0)
+    rest-client (1.7.2)
+      mime-types (>= 1.16, < 3.0)
+      netrc (~> 0.7)
     slop (3.6.0)
 
 PLATFORMS
@@ -39,8 +53,10 @@ PLATFORMS
 
 DEPENDENCIES
   childprocess
+  configliere (>= 0.4.22)
   docker-api!
   gorillib (~> 0.6)
   multi_json (>= 1.1)
   pry (~> 0.10)
   rake (~> 10.3)
+  tutum!

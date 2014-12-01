@@ -1,5 +1,9 @@
 module Rucker
 
+  def self.world
+    @world ||= Rucker::Manifest::World.load(Pathname.of(:cluster_layout), 'local')
+  end
+
   # Sorts repo_tag names in order by
   #
   # * slug, since equivalent slugs imply equivalent functions; then
@@ -123,16 +127,60 @@ end
 # Monkeypatching over a problem in current gorillb model
 #
 
-Gorillib::Model::ClassMethods.module_eval do
-  def receive(attrs={}, &block)
-    return nil if attrs.nil?
-    return attrs if native?(attrs)
-    #
-    Gorillib::Model::Validate.hashlike!(attrs){ "attributes for #{self.inspect}" }
-    type = attrs.delete(:_type) || attrs.delete('_type')
-    klass = type.present? ? Gorillib::Factory(type) : self
-    warn "factory #{klass} is not a subcass of #{self} (factory determined by _type: #{type.inspect} in #{attrs.inspect})" unless klass <= self
-    #
-    klass.new(attrs, &block)
+module Gorillib
+  Model::ClassMethods.module_eval do
+    def receive(attrs={}, &block)
+      return nil if attrs.nil?
+      return attrs if native?(attrs)
+      #
+      Gorillib::Model::Validate.hashlike!(attrs){ "attributes for #{self.inspect}" }
+      type = attrs.delete(:_type) || attrs.delete('_type')
+      klass = type.present? ? Gorillib::Factory(type) : self
+      warn "factory #{klass} is not a subcass of #{self} (factory determined by _type: #{type.inspect} in #{attrs.inspect})" unless klass <= self
+      #
+      klass.new(attrs, &block)
+    end
+  end
+  
+  module AccessorFields
+    extend Gorillib::Concern
+
+    def handle_extra_attributes(attrs)
+      accessor_fields.each do |fn|
+        instance_variable_set(:"@#{fn}", attrs.delete(fn)) if attrs.include?(fn)
+      end
+      super
+    end
+
+    module ClassMethods
+      def accessor_field(name, type=Whatever, opts={})
+        opts = opts.reverse_merge(reader: :protected, writer: false)
+        name = name.to_sym
+        #
+        attr_reader name if opts[:reader] 
+        attr_writer name if opts[:writer]
+        ivar_name = :"@#{name}"
+        define_method(:"unset_#{name}"){ remove_instance_variable(ivar_name) if instance_variable_defined?(ivar_name) }
+        #
+        [ [name, opts[:reader]], ["#{name}=", opts[:writer]] ].each do |meth, visibility|
+          case visibility
+          when true       then protected(meth)
+          when :protected then protected(meth)
+          when :private   then private(meth)
+          when :public    then public(meth)
+          end
+        end
+        #
+        self.accessor_fields += [name]
+      end
+    end
+
+    self.included do |base|
+      base.instance_eval do
+        class_attribute :accessor_fields
+        self.accessor_fields = []
+      end
+    end
+    
   end
 end

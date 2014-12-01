@@ -24,9 +24,7 @@ module Rucker
       end
 
       def has_repo_tag?(repo_tag, tag=nil)
-        repo_tag = [repo_tag, tag].compact.join(':')
-        unless (%r{:} === repo_tag) then warn "has_repo_tag? should be called with a fully-qualified repo_tag (eg foo/bar:baz) or nothing will match" ; end
-        repo_tags.include?(repo_tag.to_s)
+        repo_tags.include?([repo_tag, tag].compact.join(':'))
       end
 
       # @return [Time] Creation time of this image
@@ -47,15 +45,9 @@ module Rucker
         { repo_tags: repo_tags, size: size, id: id, created_at: created_at }
       end
 
-      def self.pull_using_manifest(img)
-        create('id'   => img.repo_tag,  'repo' => img.repo,
-          'fromImage' => img.path,  'tag'  => img.tag,
-          'registry'  => img.reg,
-          &img.method(:interpret_chunk))
-      end
-
-      def remove_using_manifest(img)
-        untag(img.repo_tag)
+      def self.pull_by_name(registry, image_name, tag, docker_creds, &callback)
+        create({'registry' => registry, 'fromImage' => image_name, 'tag' => tag},
+          docker_creds, &callback)
       end
 
       # Remove the Image from the server.

@@ -12,15 +12,16 @@ local:
     baseimage:         { repo_tag: 'phusion/baseimage:0.9.15',           external: true, est_size: '' }
     elasticsearch:     { repo_tag: 'dockerfile/elasticsearch:latest',    external: true, est_size: '' }
     #
-    baseimage:         { repo_tag: 'bd4c/baseimage:wip',  }
-    hadoop_base:       { repo_tag: 'bd4c/hadoop_base:wip',  }
-    volume_boxer:      { repo_tag: 'bd4c/volume_boxer:wip',  }
-    hadoop_nn:         { repo_tag: 'tutum.co/mrflip/hadoop_nn:wip',  }
-    hadoop_rm:         { repo_tag: 'bd4c/hadoop_rm:wip',  }
-    hadoop_snn:        { repo_tag: 'tutum.co/mrflip/hadoop_snn:wip',  }
-    hadoop_worker:     { repo_tag: 'bd4c/hadoop_worker:wip',  }
-    hadoop_lounge:     { repo_tag: 'bd4c/hadoop_lounge:wip',  }
-    lipstick:          { repo_tag: 'bd4c/lipstick:wip',  }
+    baseimage:         { repo_tag: 'bd4c/baseimage:latest',  }
+    volume_boxer:      { repo_tag: 'bd4c/volume_boxer:latest',  }
+    # lipstick:          { repo_tag: 'bd4c/lipstick:latest',  }
+    hadoop_base:       { repo_tag: 'tutum.co/mrflip/base:latest',  }
+    hadoop_nn:         { repo_tag: 'tutum.co/mrflip/nn:latest',  }
+    hadoop_rm:         { repo_tag: 'tutum.co/mrflip/rm:latest',  }
+    hadoop_snn:        { repo_tag: 'tutum.co/mrflip/snn:latest',  }
+    hadoop_hue:        { repo_tag: 'tutum.co/mrflip/hue:latest',  }
+    hadoop_worker:     { repo_tag: 'tutum.co/mrflip/worker:latest',  }
+    hadoop_lounge:     { repo_tag: 'tutum.co/mrflip/lounge:latest',  }
     #
     data_gold:         { repo_tag: 'bd4c/data_gold:wip',   'kind': 'data' }
     data_hdfs0:        { repo_tag: 'bd4c/data_hdfs0:wip',  'kind': 'data' }
@@ -74,14 +75,14 @@ local:
     #
     hadoop:
 
-      lipstick:
-        doc:         'Lipstick server for pig jobs pretty'
-        image_name:  'lipstick'
-        hostname:    'lipstick'
-        ports:       [ '10001:9292~ui' ]
-        links:       [ 'es:es' ]
-        volumes_from:
-          - home_chimpy
+      # lipstick:
+      #   doc:         'Lipstick server for pig jobs pretty'
+      #   image_name:  'lipstick'
+      #   hostname:    'lipstick'
+      #   ports:       [ '10001:9292~ui' ]
+      #   links:       [ 'es:es' ]
+      #   volumes_from:
+      #     - home_chimpy
 
       hadoop_nn:
         image_name:   'hadoop_nn'
@@ -150,32 +151,51 @@ local:
         hostname:     'worker00'
 
       #
+      hadoop_hue:
+        image_name: 'hadoop_hue'
+        hostname:     'hue'
+        ports:         [ '9622:22~ssh', '10000:10000~hue' ]
+        volumes:
+          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+          - '/Users:/Users:rw'
+        volumes_from:
+          - 'data_hue'
+          - 'home_chimpy'
+        links:
+          - 'hadoop_nn:nn'
+          - 'hadoop_rm:rm'
+          # - 'lipstick:lipstick'
+          - 'hadoop_worker00:worker00'
+          # - 'hadoop_jt:jt'
+
+      #
       # Running hue on the lounge so that there's only one URL users need to learn.
       #
       hadoop_lounge:
         image_name: 'hadoop_lounge'
         hostname:     'lounge'
-        ports:         [ '9022:22~ssh', '10000:10000~hue' ]
+        ports:         [ '9022:22~ssh' ]
         volumes:
+          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
           - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
           - '/Users:/Users:rw'
         volumes_from:
           - 'data_gold'
           - 'data_outd'
           - 'home_chimpy'
-          - 'data_hue'
         links:
           - 'hadoop_nn:nn'
           - 'hadoop_rm:rm'
-          - 'lipstick:lipstick'
+          # - 'lipstick:lipstick'
           - 'hadoop_worker00:worker00'
+          - 'hadoop_hue:hue'
           # - 'hadoop_jt:jt'
 
   # extra ports to open up to allow expansion
   extra_ports:
-    - 9622~ssh
-    - 9722~ssh
     - 9822~ssh
+    - 9722~ssh
     - 10002~util
     - 10003~util
     - 10004~util

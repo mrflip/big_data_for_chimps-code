@@ -2,7 +2,8 @@ FROM       bd4c/hadoop_base
 MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 
 ENV HADOOP_NN_HOSTNAME solo
-ENV HADOOP_RM_HOSTNAME solo
+ENV HADOOP_RM_HOSTNAME  solo
+ENV HADOOP_JT_HOSTNAME solo
 
 ENV HADOOP_CONF_DIR    /etc/hadoop/conf.single
 # Get our own set of conf files

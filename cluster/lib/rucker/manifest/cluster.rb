@@ -5,7 +5,7 @@ module Rucker
       include Rucker::Manifest::HasState
       #
       field :name, :symbol
-      accessor_field :world
+      # accessor_field :world
       collection :containers, Rucker::Manifest::ContainerCollection
       #
       def container(name)   containers[name.to_sym] ; end
@@ -13,19 +13,37 @@ module Rucker
 
       def image_names()     containers.map(&:image_name).uniq ;  end
 
-      def images()
-        world.images_slice(image_names)
+      def world
+        Rucker.world
       end
 
-      def up?()        containers.all?(&:up?)    ; end
-      def ready?()     containers.all?(&:ready?) ; end
-      def down?()      containers.all?(&:down?)  ; end
-      def clear?()     containers.all?(&:clear?) ; end
+      def images()
+        world.images.slice(*image_names)
+      end
 
-      def up(*args)    containers.up(*args)    ; end
-      def ready(*args) containers.ready(*args) ; end
-      def down(*args)  containers.down(*args)  ; end
-      def clear(*args) containers.clear(*args) ; end
+      def up?()        containers.items.all?(&:up?)    ; end
+      def ready?()     containers.items.all?(&:ready?) ; end
+      def down?()      containers.items.all?(&:down?)  ; end
+      def clear?()     containers.items.all?(&:clear?) ; end
+
+      def up
+        images.ready
+        containers.ready
+        containers.up
+      end
+
+      def ready
+        images.ready
+        containers.ready
+      end
+
+      def down
+        containers.down
+      end
+
+      def clear
+        containers.clear
+      end
 
       #
       # Info

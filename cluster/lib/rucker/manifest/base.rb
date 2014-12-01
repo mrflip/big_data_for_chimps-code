@@ -29,7 +29,7 @@ module Rucker
 
     class Base
       include Gorillib::Model
-      # include Gorillib::Model::PositionalFields
+      include Gorillib::AccessorFields
 
       def self.collection(field_name, collection_type, opts={})
         item_type = opts[:item_type] = opts.delete(:of) if opts.has_key?(:of)
@@ -40,36 +40,19 @@ module Rucker
         fld
       end
 
-      class_attribute :accessor_fields
-      self.accessor_fields = []
+      def handle_extra_attributes(attrs)
+        super
+        Rucker.warn "Extra attributes: #{attrs.keys}" if attrs.present?
+      end
+
 
       def self.type_name
         Gorillib::Inflector.demodulize(name.to_s)
       end
-
-      def type_name
-        self.class.type_name
-      end
+      def type_name() ; self.class.type_name ; end
 
       def desc
         "#{type_name} #{name}"
-      end
-
-      def self.accessor_field(name, type=Whatever, opts={})
-        name = name.to_sym
-        attr_reader name
-        attr_writer name if opts[:writer]
-        ivar_name = :"@#{name}"
-        define_method(:"unset_#{name}"){ remove_instance_variable(ivar_name) if instance_variable_defined?(ivar_name)}
-        self.accessor_fields += [name]
-      end
-
-      def handle_extra_attributes(attrs)
-        accessor_fields.each do |fn|
-          instance_variable_set(:"@#{fn}", attrs.delete(fn)) if attrs.include?(fn)
-        end
-        Rucker.warn "Extra attributes: #{attrs.keys}" if attrs.present?
-        super
       end
 
       # used by KeyedCollection to know how to index these

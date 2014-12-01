@@ -27,16 +27,22 @@ module Rucker
   end
 
   MOODS = {
-    adding:   :brg, creating: :brg, pulling: :brg, sending: :brg,
-    updating: :brb, pushing:  :brb, tagging: :brb, downloading: :brb,
-    starting: :brb, unpausing: :brb,
-    stopping: :red, pausing:  :red,
+    # creation
+    adding:   :brg, creating: :brg, pulling:   :brg, sending:     :brg,
+    # change
+    updating: :brb, tagging:  :brb, pushing:   :brb, downloading: :brb,
+    starting: :brb, unpausing: :brb, authing:  :brb,
+    # destruction
+    stopping: :red, pausing:   :red,
     removing: :brr,
-    with:     :grn, as: :grn,
-    note:     :red,
-
+    # self
+    as:       :cya, for:      :cya,
+    # other
+    with:     :mag, to:       :mag, from: :mag,
+    # alertness
+    note:     :red, danger:   :brr, error: :brr
   }
-  # completed actions are neutral
+  # completed actions represent mild change
   %w[added created pulled pushed tagged removed
      stopped started paused unpaused sent downloaded
      ].each{|mood| MOODS[mood.to_sym] = :blu }
@@ -46,16 +52,20 @@ module Rucker
     opts      = opts.reverse_merge(indent: 1)
     indent    = opts.delete(:indent)
     skipped   = opts.delete(:skipped)
+    error     = opts[:error]
     subj_desc = (subj.respond_to?(:desc) ? subj.desc : subj)
     #
-    mood      = MOODS[action] || :normal
-    mood      = :normal if skipped.present?
-    action_str = action.to_s.humanize
-    action_str = "not #{action_str}" if skipped
+    return if (not error) && (opts.include?(:mute)) && (rand > opts.delete(:mute).to_f)
+    #
+    mood      = MOODS[action.to_sym] || :normal
+    mood      = :normal        if skipped.present?
+    mood      = MOODS[:error]  if error.present?
+    action_str = ("  "*indent)
+    action_str << "not " if (skipped || error)
+    action_str << action.to_s.humanize
     #
     text = []
-    text << ("  "*indent)
-    text << mood << ("%-12s" % action_str) << ' '
+    text << mood << ("%-15s" % action_str) << ' '
     text << :cya << ("%-30s" % subj_desc)
     #
     opts.each do |phrase, words|

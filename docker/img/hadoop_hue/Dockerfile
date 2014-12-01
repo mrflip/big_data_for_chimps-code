@@ -5,20 +5,19 @@ MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 ENV  HUE_CONF_DIR        /etc/hue/conf.cluster
 ENV  HUE_HOME            /usr/lib/hue
 ENV  HUE_DATA_DIR        /bulk/hadoop/hue
-ENV  HADOOP_HIVE_HOSTNAME lounge
 
 # Config files for my_init/mustache_rider.sh to prepare
 # 
-COPY img/hadoop_lounge/conf/hue.ini.mustache $HUE_CONF_DIR/
+COPY img/hadoop_hue/conf/hue.ini.mustache $HUE_CONF_DIR/
 
 # Install and configure Hue.
 #
-COPY img/hadoop_lounge/hadoop-setup_hue.sh  /build/
+COPY img/hadoop_hue/hadoop-setup_hue.sh  /build/
 RUN             /build/hadoop-setup_hue.sh
 
 # Copy the hue config scripts and enable the servise
 #
-COPY img/hadoop_lounge/runit/hadoop_hue-runner.sh /etc/sv/hadoop_hue/run
-COPY img/hadoop_lounge/runit/hadoop_hue-logger.sh /etc/sv/hadoop_hue/log/run
+COPY img/hadoop_hue/runit/hadoop_hue-runner.sh /etc/sv/hadoop_hue/run
+COPY img/hadoop_hue/runit/hadoop_hue-logger.sh /etc/sv/hadoop_hue/log/run
 #
 RUN  ln -s /etc/sv/hadoop_hue /etc/service/hadoop_hue

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -v ; set -e # talk out loud and die easy
+set -x ; set -e ; date # talk out loud and die easy
 
 #
 # Build

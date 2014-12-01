@@ -18,12 +18,15 @@ module Rucker
       #
       collection :ports,   Rucker::Manifest::PortBindingCollection
       #
-      accessor_field :actual, Rucker::Actual::ActualContainer, writer: true
-      protected :actual
-      accessor_field :image,  Rucker::Manifest::Image, writer: true
-      protected :image
+      accessor_field :actual, Rucker::Actual::ActualContainer, writer: :public, reader: :public
+      accessor_field :image,  Rucker::Manifest::Image,         writer: :public
+      accessor_field :world,  Rucker::Manifest::Base,          writer: :public
       #
       class_attribute :max_retries; self.max_retries = 10
+
+      def id
+        actual.try(:id)
+      end
 
       def state
         return :absent if self.actual.blank?
@@ -36,6 +39,7 @@ module Rucker
       end
 
       def image_id()        image.try(:short_id)     ; end
+      def image_repo_tag()  image.try(:repo_tag)     ; end
 
       def ip_address()      actual.try(:ip_address)  ; end
 
@@ -49,6 +53,17 @@ module Rucker
         ports.items.select(&:published?)
       end
 
+      def linked_containers
+        named_ctrs = links.map do |link_str|
+          ctr_name, as_name = link_str.split(':', 2)
+          ctr = Rucker.world.container(ctr_name)
+          ctr.present? or raise("Missing linked container for #{ctr_name}:#{as_name} in #{self}: #{self.links}")
+          #
+          [as_name, ctr]
+        end
+        Hash[named_ctrs]
+      end
+
       #
       # Orchestration movements
       #
@@ -60,6 +75,8 @@ module Rucker
 
       # Take the next step towards the up goal
       def _up
+        _ready_linked or return false # wait for dependent containers
+        _up_linked    or return false # wait for dependent containers
         case state
         when :running then            return true
         when :paused  then _unpause ; return false # wait for unpause
@@ -70,9 +87,45 @@ module Rucker
         end
       end
 
+      def _ready_image
+        return true if image.try(:ready?)  # if no image, pull it
+        image.try(:_ready)
+      end
+
+      def _up_linked
+        linked_containers.each do |_, other|
+          next if other.up?
+          other._up
+          return false
+        end
+        true
+      end
+
+      def _ready_linked
+        linked_containers.each do |oname, other|
+          next if other.ready?
+          other._ready
+          return false
+        end
+        true
+      end
+
+      # def _ready_linked(results)
+      #   linked_containers.each do |oname, other|
+      #     if other.blank?
+      #       results[:fail] << [:]
+      #     end
+      #     #
+      #     next if other.ready?
+      #     other._ready
+      #     return false
+      #   end
+      #   true
+      # end
+
       # Take the next step towards the ready goal
       def _ready
-        return image.try(:ready) unless image.try(:ready?)  # if no image, pull it
+        _ready_image  or return false # wait for pull
         case state
         when :running then            return true
         when :paused  then            return true
@@ -186,7 +239,8 @@ module Rucker
 
     class DataContainer < Rucker::Manifest::Container
       def _up
-        return true if exit_code == 0 # all that matters is that it was started once
+        # If it was started once, that's enough.
+        return true if (started_at) && (exit_code == 0)
         super
       end
     end
@@ -195,7 +249,7 @@ module Rucker
       include Rucker::Manifest::HasState
       #
       self.item_type = Rucker::Manifest::Container
-      class_attribute :max_retries; self.max_retries = 10
+      class_attribute :max_retries; self.max_retries = 6
 
       def desc
         str = (item_type.try(:type_name) || 'Item')+'s'
@@ -219,8 +273,7 @@ module Rucker
 
       def invoke_until_satisfied(operation, *args)
         max_retries.times do |idx|
-          Rucker.output("#{operation} -> #{belongs_to.desc} (#{length} #{item_type.type_name})#{idx > 1 ? " (#{idx})" : ''}")
-          Rucker.output("  #{desc} are #{state_desc}")
+          Rucker.progress(:"get_#{operation}", self, pass: idx, from: state_desc, for: keys.join(','), indent: 0)
           successes = items.map do |ctr|
             begin
               ctr.public_send(:"_#{operation}", *args)

@@ -333,12 +333,3 @@ pig -x local 04-intro_to_pig/a-ufo_visits_by_month.pig
    # Look ma, just what we predicted!
 colordiff -uw /data/outd/ufos/sightings_hist{-reference.tsv,/part*} && echo 'No diffference'
 ```
-
-
-## Commanding the Cluster -- tl;dr Quickie Version
-
-Here's the summary in brief. Any doubts or problems, rewind and walk through the instructions below.
-
-Initial start:
-
-```

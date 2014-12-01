@@ -16,7 +16,7 @@ module Rucker
       def names()           @info['Names']   ; end
 
       # Name for the image used to create this container
-      def image_name()      @info['Image']   ; end
+      def image_repo_tag()      @info['Image']   ; end
 
       # Command that the container runs
       def command_str()     @info['Command'] ; end
@@ -57,7 +57,7 @@ module Rucker
       def ip_address()      ext_info['NetworkSettings']['IPAddress'] ;  end
       def image_id()        ext_info['Image']               ; end
       # As requested at config time
-      def conf_image_name() ext_info['Config']['Image'] ; end
+      def conf_image_repo_tag() ext_info['Config']['Image'] ; end
       def conf_volumes()    ext_info['Config']['Volumes'].keys   || Array.new rescue Array.new ; end
       def volumes_from()    ext_info['HostConfig']['VolumesFrom'] || Array.new ; end
       # runtime ing
@@ -97,7 +97,7 @@ module Rucker
       # Volume status
       # @return [Hash] hash with keys `name`, `path` and `writeable`
       def volumes()
-        ext_info['Volumes'].map do |name, path|
+        (ext_info['Volumes'] || []).map do |name, path|
           writeable = !! ext_info["VolumesRW"][name]
           { name: name, path: path, writeable: writeable }
         end
@@ -144,7 +144,7 @@ module Rucker
         ctr.volumes.each{|vol| vol_spec[vol.gsub(/:.*/,'')] = Hash.new }
         {
           'name'              => ctr.name,
-          'Image'             => ctr.image_name,
+          'Image'             => ctr.image_repo_tag,
           'Entrypoint'        => ctr.entrypoint,
           'Cmd'               => ctr.entry_args,
           'Hostname'          => ctr.hostname,
@@ -203,7 +203,7 @@ module Rucker
           names:       names,
           id:          id,
           created_at:  created_at,
-          image_name:  image_name,
+          image_repo_tag:  conf_image_repo_tag,
           status_str:  status_str,
           ports:       ports,
           state:       state_hsh[:state],
@@ -226,28 +226,28 @@ module Rucker
         hsh
       end
 
-      #
-      # These are dupes of methods in Docker-api just to get subclasses right.
-      #
-      
-      # Return a String representation of the Container.
-      def to_s
-        "#{self.class.name} { :id => #{self.id}, :connection => #{self.connection} }"
-      end
-
-      # Create an Image from a Container's change.s
-      def commit(options = {})
-        options.merge!('container' => self.id[0..7])
-        # [code](https://github.com/dotcloud/docker/blob/v0.6.3/commands.go#L1115)
-        # Based on the link, the config passed as run, needs to be passed as the
-        # body of the post so capture it, remove from the options, and pass it via
-        # the post body
-        config = options.delete('run')
-        hash = Docker::Util.parse_json(connection.post('/commit',
-            options,
-            :body => config.to_json))
-        Rucker::Actual::ActualImage.send(:new, self.connection, hash)
-      end
+      # #
+      # # These are dupes of methods in Docker-api just to get subclasses right.
+      # #
+      # 
+      # # Return a String representation of the Container.
+      # def to_s
+      #   "#{self.class.name} { :id => #{self.id}, :connection => #{self.connection} }"
+      # end
+      # 
+      # # Create an Image from a Container's change.s
+      # def commit(options = {})
+      #   options.merge!('container' => self.id[0..7])
+      #   # [code](https://github.com/dotcloud/docker/blob/v0.6.3/commands.go#L1115)
+      #   # Based on the link, the config passed as run, needs to be passed as the
+      #   # body of the post so capture it, remove from the options, and pass it via
+      #   # the post body
+      #   config = options.delete('run')
+      #   hash = Docker::Util.parse_json(connection.post('/commit',
+      #       options,
+      #       :body => config.to_json))
+      #   Rucker::Actual::ActualImage.send(:new, self.connection, hash)
+      # end
 
       #
       # Reference:
