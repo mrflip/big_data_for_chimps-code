@@ -169,7 +169,8 @@ module Rucker
     Image.class_eval do
       def self.table_fields
         {
-          namespace:     [ '%-15s', {}  ],
+          registry:      [ '%-15s', {}  ],
+          repo:          [ '%-15s', {}  ],
           slug:          [ '%-15s', {}  ],
           tag:           [ '%-7s',  {}  ],
           readable_size: [ '%7s',   { title: 'Size' }  ],

@@ -1,6 +1,6 @@
 GIT
   remote: git://github.com/mrflip/docker-api.git
-  revision: 3a748e9e709123303f171e2d2dfab90b27e5cbf2
+  revision: 450c4f69a2dd47e270b56b32818e14c58b879516
   branch: master
   specs:
     docker-api (1.15.0)

@@ -195,7 +195,7 @@ module Rucker
       PROGRESS_BAR_RE = %r{\[([^\]])\] ([\d\.]+) (\w\w)/([\d\.]+) (\w\w) (\w+)}
       PROGRESS_MUTING = 0.1
 
-      def interpret_chunk(step)
+      def interpret_chunk(step, actual)
         case step['status']
         when /^(Pushing|Pulling) repository ([^\s]+)(?: \((\d+) tags\))?/
           Rucker.progress(($1.downcase.to_sym), self, from: $2)
@@ -366,21 +366,21 @@ module Rucker
               thr = Thread.new{
                 10.times do
                   begin
+                    break if tasks.empty?
+                    break if errors.present? && (not opts[:ignore_failure])
                     key, img = tasks.pop
-                    puts "#{worker_idx} beg: #{[key, img]} -- #{tasks.map(&:first)}"
                     results[key] = callback.call(key, img)
-                    puts "#{worker_idx} fin: #{[key, results[key]]} -- #{tasks.map(&:first)}"
+                    Rucker.progress(operation, "worker_#{worker_idx}", finished: key, with: results[key], remaining: tasks.length)
                   rescue StandardError => err
                     Rucker.progress(operation, img, error: err.message)
                     errors[key] = err
                   end
-                  break if errors.present? && (not opts[:ignore_failure])
                 end
               }
             end
             img_threads.each_with_index do |thr, idx|
               thr.join
-              Rucker.progress(operation, "worker_#{idx}", task: 'complete')
+              Rucker.progress(operation, "worker_#{idx}", finished: "running #{operation}")
             end
             if errors.present? && (not opts[:ignore_failure])
               err = Rucker::Error::ParallelError.with_errors(errors)
@@ -391,41 +391,10 @@ module Rucker
         end
       end
 
-      # ::Rucker.module_eval do
-      #   def self.parallelize(coll, operation, num_threads, mutex, opts, &callback)
-      #     mutex.synchronize do
-      #       results = { }
-      #       errors  = { }
-      #       coll.each_pair.each_slice(num_threads) do |tasks|
-      #         img_threads = tasks.map do |key, img|
-      #           thr = Thread.new{
-      #             begin
-      #               results[key] = callback.call(key, img)
-      #             rescue StandardError => err
-      #               Rucker.progress(operation, img, error: err.message)
-      #               errors[key] = err
-      #             end
-      #           }
-      #           [key, thr]
-      #         end
-      #         img_threads.each do |key, thr|
-      #           thr.join
-      #           Rucker.progress(operation, key, task: 'complete')
-      #         end
-      #         if errors.present? && (not opts[:ignore_failure])
-      #           err = Rucker::Error::ParallelError.with_errors(errors)
-      #           raise err
-      #         end
-      #       end
-      #       [results, errors]
-      #     end
-      #   end
-      # end
-
       @@push_pull_mutex ||= Mutex.new
 
       def pull_all(opts={})
-        Rucker.parallelize(self, :pulled, 3, @@push_pull_mutex, opts) do |key, img|
+        Rucker.parallelize(self, :pull, 3, @@push_pull_mutex, opts) do |key, img|
           img._pull(opts)
           img.refresh!
         end
@@ -433,7 +402,7 @@ module Rucker
 
       def push_all(opts={})
         imgs_to_push = select_coll(&:ours?)
-        Rucker.parallelize(imgs_to_push, :pushed, 3, @@push_pull_mutex, opts) do |key, img|
+        Rucker.parallelize(imgs_to_push, :push, 3, @@push_pull_mutex, opts) do |key, img|
           img._push(opts)
         end
       end

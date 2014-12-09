@@ -55,69 +55,6 @@ module Rucker
         connection.delete("/images/#{repo_tag}", opts)
       end
 
-      # # Push the Image to the Docker registry.
-      # def push_to(registry, ns, slug, tag_name, credentials, options = {})
-      #   if registry =~ /index\.docker\.io/
-      #     pushed_name = "#{ns}/#{slug}"
-      #   else
-      #     pushed_name = "#{registry}/#{ns}/#{slug}"
-      #   end
-      #   tag(repo: pushed_name, tag: tag_name)
-      #   #
-      #   headers = Docker::Util.build_auth_header(credentials)
-      #   opts = {:tag => tag_name}.merge(options)
-      #   p [registry, pushed_name, tag_name, credentials, opts]
-      #   callback = opts.delete(:response_block)
-      #   connection.post("/images/#{pushed_name}/push", opts, :headers => headers, &callback)
-      #   self
-      # end
-
-      #
-      # These are brought over from Docker::Image so that they behave as
-      # proper subclasses.
-      #
-
-      # # Create a new Image.
-      # def self.create(query = {}, creds = nil, conn = Docker.connection)
-      #   credentials = creds.nil? ? Docker.creds : creds.to_json
-      #   headers = !credentials.nil? && Docker::Util.build_auth_header(credentials)
-      #   headers ||= {}
-      #   caller_resp_blk = query.delete(:response_block)
-      #   new_id = nil
-      #   resp_blk = lambda do |chunk, *_|
-      #     step = MultiJson.decode(chunk)
-      #     if    step['error'] && (%r{not found in repository} === step['error'])
-      #       raise Docker::Error::NotFoundError, step['error']
-      #     elsif step['error']
-      #       raise Docker::Error::ServerError,   step['error']
-      #     end
-      #     new_id = step['id'] if step['id']
-      #     # TODO: what should we do with errors here?
-      #     caller_resp_blk.call(step) if caller_resp_blk
-      #   end
-      #   #
-      #   body = conn.post('/images/create', query, :headers => headers, :response_block => resp_blk)
-      #   new(conn, 'id' => new_id, :headers => headers)
-      # end
-
-      # # Return a String representation of the Image.
-      # def to_s
-      #   "#{self.class.name} { :id => #{self.id}, :info => #{self.info.inspect}, "\
-      #   ":connection => #{self.connection} }"
-      # end
-      # 
-      # 
-      # # Update the @info hash, which is the only mutable state in this object.
-      # def refresh!
-      #   img = self.class.all(:all => true).find { |image|
-      #     image.id.start_with?(self.id) || self.id.start_with?(image.id)
-      #   }
-      #   info.merge!(self.json)
-      #   img && info.merge!(img.info)
-      #   self
-      # end
-
-
     end
   end
 end

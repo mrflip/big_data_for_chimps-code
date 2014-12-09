@@ -4,6 +4,46 @@ module Rucker
     @world ||= Rucker::Manifest::World.load(Pathname.of(:cluster_layout), 'local')
   end
 
+
+  IMAGE_REG_REPO_SLUG_RE = %r{\A
+        (?:   ([^/]+)                 / )     # registry/
+        (?:   ([a-z0-9_]{1,30})       / )     # repo/   ( a-z 0-9 _     )
+              ([a-z0-9_\.\-]+|<none>)         # slug    ( a-z 0-9 - . _ )
+        (?: : ([a-z0-9_\.\-]+|<none>)   )?    # :tag    ( a-z 0-9 - . _ ) optional
+      \z}x
+  IMAGE_REPO_SLUG_RE = %r{\A
+      (                                       # family (repo/slug or just slug)
+        (?:   ([^/]+)                 / )?    # repo/   optional
+              ([a-z0-9_\.\-]+|<none>)      )  # slug    ( a-z 0-9 - . _ )
+        (?: : ([a-z0-9_\.\-]+|<none>)   )?    # :tag,   ( a-z 0-9 - . _ ) optional
+      \z}x
+  # Breaks up the various laxities of image names:
+  #
+  #   reg/repo/slug:tag
+  #   reg/repo/slug
+  #       repo/slug:tag
+  #       repo/slug
+  #            slug:tag
+  #            slug
+  #
+  # @return [Hash] key-value pairs for reg, repo, slug and tag, as well as
+  #   'family' -- all but the tag part
+  #   'name' -- the full name just as given.
+  #
+  # @raise [ArgumentError] if it cannot find a match.
+  def self.parse_reg_repo_tag(repo_tag)
+    case repo_tag
+    when IMAGE_REG_REPO_SLUG_RE
+      { reg: $1,  repo: $2, slug: $3, tag: $4,
+        repo_tag: repo_tag, family: "#{$1}/#{$2}/#{$3}" }
+    when IMAGE_REPO_SLUG_RE
+      { reg: nil, repo: $2, slug: $3, tag: $4,
+        repo_tag: repo_tag, family: $1 }
+    else
+      raise(ArgumentError, "Could not parse image repo_tag #{repo_tag}")
+    end
+  end
+  
   # Sorts repo_tag names in order by
   #
   # * slug, since equivalent slugs imply equivalent functions; then
