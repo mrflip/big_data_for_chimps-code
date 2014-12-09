@@ -93,10 +93,3 @@ graphable = FOREACH people {
                                death:tuple(date, city, state, country) )
     ;
 };
-
--- Converting types
-birthplaces = FOREACH people GENERATE
-    player_id,
-    StringConcat((chararray)birth_year, '-', (chararray)birth_month, '-', (chararray)birth_day) AS birth_date
-;
-  
