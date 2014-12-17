@@ -58,3 +58,52 @@ weight_yr_stats = FOREACH (GROUP bat_seasons BY year_id) {
         BagToString(some, '^')         AS some_vals
     ;
 };
+
+
+-- Summary of a String Field
+REGISTER /usr/lib/pig/datafu.jar 
+
+DEFINE VAR datafu.pig.stats.VAR();
+DEFINE ApproxEdgeile datafu.pig.stats.StreamingQuantile('0.01','0.05', '0.10', '0.50', '0.95', '0.90', '0.99');
+
+name_first_summary_0 = FOREACH (GROUP bat_seasons ALL) {
+    dist       = DISTINCT bat_seasons.name_first;
+    lens       = FOREACH  bat_seasons GENERATE SIZE(name_first) AS len;
+    --
+    n_recs     = COUNT_STAR(bat_seasons);
+    n_notnulls = COUNT(bat_seasons.name_first);
+    --
+    examples   = LIMIT    dist.name_first 5;
+    snippets   = FOREACH  examples GENERATE 
+        (SIZE(name_first) > 15 ? CONCAT(SUBSTRING(name_first, 0, 15),'…') : name_first) AS val;
+    GENERATE
+        group,
+        'name_first'                   AS var:chararray,
+        MIN(lens.len)                  AS minlen,
+        MAX(lens.len)                  AS maxlen,
+        --
+        AVG(lens.len)                  AS avglen,
+        SQRT(VAR(lens.len))            AS stdvlen,
+        SUM(lens.len)                  AS sumlen,
+        --
+        n_recs                         AS n_recs,
+        n_recs - n_notnulls            AS n_nulls,
+        COUNT_STAR(dist)               AS cardinality,
+        MIN(bat_seasons.name_first)    AS minval,
+        MAX(bat_seasons.name_first)    AS maxval,
+        BagToString(snippets, '^')     AS examples,
+        lens  AS lens
+    ;
+};
+
+name_first_summary = FOREACH name_first_summary_0 {
+    sortlens   = ORDER lens BY len;
+    pctiles    = ApproxEdgeile(sortlens);
+    GENERATE
+        var,
+        minlen, FLATTEN(pctiles) AS (p01, p05, p10, p50, p90, p95, p99), maxlen,
+        avglen, stdvlen, sumlen,
+        n_recs, n_nulls, cardinality,
+        minval, maxval, examples
+    ;
+};
