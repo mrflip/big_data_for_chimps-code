@@ -23,3 +23,6 @@ $safe_apt_install python-mrjob
 $safe_apt_install oozie-client  
 $safe_apt_install hive-hcatalog hive-webhcat hive-webhcat-server
 
+
+# curl -s https://raw.githubusercontent.com/jeffkaufman/icdiff/release-1.3.1/icdiff
+# -o /usr/local/bin/icdiff && sudo chmod ugo+rx /usr/local/bin/icdiff

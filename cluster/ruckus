@@ -3,7 +3,7 @@ begin  require 'bundler' ;
 rescue LoadError => err ; abort "The bundler gem is not installed: #{err}; check the README.md\nWithin the #{File.dirname(__FILE__)} directory, run\n'gem install bundler', then 'bundle install', and try again."
 end
 
-Bundler.require(:default, :docker)
+Bundler.require(:default, :docker, :tutum)
 require_relative '../cluster/lib/rucker'
 #
 Rucker.config.parse_argv!

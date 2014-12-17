@@ -2,7 +2,7 @@ require 'yaml'
 require 'multi_json'
 require 'docker'
 require 'thread'
-
+require 'tutum'
 
 require 'gorillib'
 require 'gorillib/pathname'
@@ -34,10 +34,13 @@ require_relative 'rucker/manifest/image'
 require_relative 'rucker/manifest/image'
 require_relative 'rucker/manifest/container'
 require_relative 'rucker/manifest/cluster'
+require_relative 'rucker/manifest/node'
 require_relative 'rucker/manifest/world'
 #
 require_relative 'rucker/runner'
 require_relative 'rucker/formatter/table'
+#
+require_relative 'rucker/tutum'
 
 module Rucker
 
@@ -58,13 +61,27 @@ module Rucker
     end
     %w[ utils
          manifest/base manifest/world manifest/cluster
-         manifest/image manifest/container
+         manifest/image manifest/container manifest/node
          actual/actual_image    actual/actual_container
-         actual/tutum_container
+         tutum tutum/tutum_base tutum/tutum_provider tutum/tutum_service tutum/tutum_container
          utils/formatter ].each do |fn|
       load File.join(lib_dir, "rucker/#{fn}.rb")
     end
     true
+  end
+
+
+  def self.provider
+    # Rucker::Actual::ActualContainer
+    Rucker::Tutum::TutumService
+  end
+
+  def self.tutum
+    @tutum ||=
+      begin
+        creds = ::Rucker::Manifest::World.authenticate!('tutum.co')
+        ::Tutum.authenticate!(creds['username'], creds['api_key'])
+      end
   end
 
   #

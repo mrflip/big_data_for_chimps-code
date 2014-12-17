@@ -10,7 +10,7 @@ GIT
 
 GIT
   remote: git://github.com/tutumcloud/ruby-tutum.git
-  revision: fcc47826e892e43b970372898d90eff5e82b362e
+  revision: 42aed4cadbde52913342bdc1299381b835d3ab7d
   branch: master
   specs:
     tutum (0.2.2)

@@ -64,26 +64,99 @@ module Rucker
         Hash[named_ctrs]
       end
 
+      def volume_containers
+        named_ctrs = Hash[
+          volumes_from.map{|nm| [nm, Rucker.world.container(nm)] }]
+      end
+
       #
       # Orchestration movements
       #
 
+      READY_STATES = [
+        :running, :paused, :stopped, :init, :starting,
+        :restart, :scaling, :redeploying, :stopping
+      ].to_set
+      DOWN_STATES  = [
+        :stopped, :init, :not_running, :absent
+      ]
+
       def up?()     running?                        ; end
-      def ready?()  running? || stopped? || paused? ; end
-      def down?()   absent?  || stopped?            ; end
+      def ready?()  READY_STATES.include?(state)    ; end
+      def down?()   DOWN_STATES.include?(state)     ; end
       def clear?()  absent?                         ; end
 
       # Take the next step towards the up goal
       def _up
+        _ready_image  or return false # wait for pull
         _ready_linked or return false # wait for dependent containers
         _up_linked    or return false # wait for dependent containers
         case state
-        when :running then            return true
-        when :paused  then _unpause ; return false # wait for unpause
-        when :stopped then _start   ; return false # wait for start
-        when :restart then            return false
-        when :absent  then _ready   ; return false # wait for ready
-        else                          return false # don't know, hope we figure it out.
+        when :running      then            return true
+        when :paused       then _unpause ; return false # invoke unpause
+        when :stopped      then _start   ; return false # invoke start
+        when :init         then _start   ; return false # invoke start
+        when :absent       then _ready   ; return false # invoke ready
+        when :starting, :restart, :scaling, :redeploying, :stopping
+          return false # wait until out of transition
+        when :partly,  :not_running
+          warn "halp: #{state} wut do i do" ; return false
+        else
+          Rucker.warn "unknown state #{state}" ; return false
+        end
+      end
+
+      # Take the next step towards the ready goal
+      def _ready
+        _ready_image  or return false # wait for pull
+        _ready_linked or return false # wait for dependent containers
+        case state
+        when :running      then            return true
+        when :paused       then            return true
+        when :stopped      then            return true
+        when :init         then            return true
+        when :absent       then _create  ; return false # invoke create
+        when :starting, :restart, :scaling, :redeploying, :stopping
+          return false # wait until out of transition
+        when :partly,  :not_running
+          warn "halp: #{state} wut do i do" ; return false
+        else
+          Rucker.warn "unknown state #{state}" ; return false
+        end
+      end
+
+      # Take the next step towards the down goal
+      def _down
+        case state
+        when :running      then _stop    ; return false # invoke stop
+        when :paused       then _stop    ; return false # invoke stop
+        when :partly       then _stop    ; return false # invoke stop
+        when :not_running  then            return true
+        when :stopped      then            return true
+        when :init         then            return true
+        when :absent       then            return true
+        when :starting, :restart, :scaling, :redeploying, :stopping
+          return false # wait until out of transition
+        else
+          Rucker.warn "unknown state #{state}" ; return false
+        end
+      end
+
+      # Take the next step towards the clear goal
+      def _clear
+        case state
+        when :running      then _down    ; return false # invoke down
+        when :paused       then _down    ; return false # invoke down
+        when :partly       then _down    ; return false # invoke down
+        when :not_running  then _remove  ; return false # invoke remove
+        when :stopped      then _remove  ; return false # invoke remove
+        when :init         then _remove  ; return false # invoke remove
+        when :absent       then          ; return true
+        when :starting, :restart, :scaling, :redeploying, :stopping
+          return false # wait until out of transition
+        else
+          Rucker.warn "unknown state #{state}"
+          return false # don't know, hope we figure it out.
         end
       end
 
@@ -104,6 +177,7 @@ module Rucker
       def _ready_linked
         linked_containers.each do |oname, other|
           next if other.ready?
+          puts "#{self.name} waiting for #{oname} to become ready"
           other._ready
           return false
         end
@@ -123,43 +197,6 @@ module Rucker
       #   true
       # end
 
-      # Take the next step towards the ready goal
-      def _ready
-        _ready_image  or return false # wait for pull
-        case state
-        when :running then            return true
-        when :paused  then            return true
-        when :stopped then            return true
-        when :restart then            return false # wait for restart
-        when :absent  then _create  ; return false # wait for create
-        else                          return false # don't know, hope we figure it out.
-        end
-      end
-
-      # Take the next step towards the down goal
-      def _down
-        case state
-        when :running then _stop    ; return false # wait for stop
-        when :paused  then _stop    ; return false # wait for stop
-        when :stopped then            return true
-        when :restart then            return false # wait for restart
-        when :absent  then            return true
-        else                          return false # don't know, hope we figure it out.
-        end
-      end
-
-      # Take the next step towards the clear goal
-      def _clear
-        case state
-        when :running then _down    ; return false # wait for down
-        when :paused  then _down    ; return false # wait for down
-        when :stopped then _remove  ; return false # wait for remove
-        when :restart then            return false
-        when :absent  then          ; return true
-        else return false # don't know, hope we figure it out.
-        end
-      end
-
       #
       # Procedural actions
       #
@@ -168,43 +205,43 @@ module Rucker
       # running the specified command. You can then start it at any point.
       def _create
         Rucker.progress(:creating, self)
-        self.actual = Rucker::Actual::ActualContainer.create_from_manifest(self)
-        forget() ; self
+        self.actual = Rucker.provider.create_from_manifest(self)
+        forget()
       end
 
       # Start a created container
       def _start
         Rucker.progress(:starting, self)
         actual.start_from_manifest(self)
-        forget() ; self
+        forget()
       end
 
       # Stop a running container by sending `SIGTERM` and then `SIGKILL` after a grace period
       def _stop
         Rucker.progress(:stopping, self)
         actual.stop_from_manifest(self)
-        forget() ; self
+        forget()
       end
 
       # Remove a container completely.
       def _remove
         Rucker.progress(:removing, self)
         actual.remove('v' => 'true')
-        forget() ; self
+        forget()
       end
 
       # Pause all processes within a container. The docker pause command uses the cgroups freezer to suspend all processes in a container. Traditionally when suspending a process the SIGSTOP signal is used, which is observable by the process being suspended. With the cgroups freezer the process is unaware, and unable to capture, that it is being suspended, and subsequently resumed.
       def _pause()
         Rucker.progress(:pausing, self)
         actual.pause()
-        forget() ; self
+        forget()
       end
 
       # The docker unpause command uses the cgroups freezer to un-suspend all processes in a container.
       def _unpause()
         Rucker.progress(:unpausing, self)
         actual.pause()
-        forget() ; self
+        forget()
       end
 
       def commit(new_name)
@@ -212,7 +249,6 @@ module Rucker
         img = actual.commit(new_name)
         Rucker.progress(:created,  img, now: "has names #{img.names.join(',')} and id #{img.short_id}")
         world.refresh!
-        self
       end
 
       # Display the running processes of a container. Options are passed along to PS.
@@ -229,7 +265,6 @@ module Rucker
 
       def forget
         actual.forget if actual.present?
-        self
       end
 
       def to_wire(*)
@@ -238,9 +273,12 @@ module Rucker
     end
 
     class DataContainer < Rucker::Manifest::Container
-      def _up
+      def up?
         # If it was started once, that's enough.
-        return true if (started_at) && (exit_code == 0)
+        ((started_at) && (exit_code == 0)) || super
+      end
+      def _up
+        return true if up?
         super
       end
     end
@@ -249,7 +287,7 @@ module Rucker
       include Rucker::Manifest::HasState
       #
       self.item_type = Rucker::Manifest::Container
-      class_attribute :max_retries; self.max_retries = 6
+      class_attribute :max_retries; self.max_retries = 12
 
       def desc
         str = (item_type.try(:type_name) || 'Item')+'s'
@@ -273,7 +311,7 @@ module Rucker
 
       def invoke_until_satisfied(operation, *args)
         max_retries.times do |idx|
-          Rucker.progress(:"get_#{operation}", self, pass: idx, from: state_desc, for: keys.join(','), indent: 0)
+          Rucker.progress(:"get_#{operation}", self, pass: idx, from: state_desc, on: keys.join(','), indent: 0)
           successes = items.map do |ctr|
             begin
               ctr.public_send(:"_#{operation}", *args)
@@ -283,7 +321,8 @@ module Rucker
             end
           end
           return true if successes.all? # we caused no changes in the world, so don't need to refresh
-          sleep 1.5
+          sleep( 2 * idx )
+          Rucker.progress(:"refreshing", self, indent: 0)
           refresh!
         end
         Rucker.die "Could not bring #{self.inspect_compact} to #{operation} after #{max_retries} attempts. Dying."
@@ -303,10 +342,13 @@ module Rucker
         # Grab all the containers
         #
         ctr_names = keys.to_set
-        Rucker::Actual::ActualContainer.all('all' => 'True').map do |actual|
+        Rucker.provider.all().map do |actual|
+          next unless actual.exists?
+          # p [actual, actual.names, ctr_names ]
           # if any name matches a manifest, gift it; skip the actual otherwised
-          name = ctr_names.intersection(actual.names).first or next
-          self[name].actual = actual
+          ctr_names.intersection(actual.names).each do |name|
+            self[name].actual = actual
+          end
         end
         self
       end

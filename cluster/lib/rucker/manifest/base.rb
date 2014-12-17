@@ -31,15 +31,6 @@ module Rucker
       include Gorillib::Model
       include Gorillib::AccessorFields
 
-      def self.collection(field_name, collection_type, opts={})
-        item_type = opts[:item_type] = opts.delete(:of) if opts.has_key?(:of)
-        opts = opts.reverse_merge(
-          default: ->{ collection_type.new(item_type: item_type, belongs_to: self) } )
-        fld = field(field_name, collection_type, opts)
-        define_collection_receiver(fld)
-        fld
-      end
-
       def handle_extra_attributes(attrs)
         super
         Rucker.warn "Extra attributes: #{attrs.keys}" if attrs.present?

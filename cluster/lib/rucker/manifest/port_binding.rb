@@ -13,11 +13,14 @@ module Rucker
         !! hport
       end
 
-      def to_s
+      def compact_string
         [ (bind  ? "#{bind}:"      : nil),
           (hport ? "#{hport}:"     : nil),
           cport,
           (proto == 'udp' ? '/udp' : nil) ].compact.join
+      end
+      def to_s
+        compact_string
       end
 
       def cport_proto
@@ -61,10 +64,10 @@ module Rucker
       end
 
       def to_wire(*)
-        to_s
+        compact_string
       end
 
-      def collection_key()        to_s ; end
+      def collection_key()        compact_string ; end
       def set_collection_key(key) receive!(self.class.parse_portstr(key)); end
     end
 
@@ -81,6 +84,10 @@ module Rucker
           hsh[port.cport_proto] << { 'HostIp' => port.bind, 'HostPort' => port.hport.to_s }
         end
         hsh
+      end
+
+      def inspect
+        "[#{map(&:to_s).join(',')}]"
       end
     end
   end

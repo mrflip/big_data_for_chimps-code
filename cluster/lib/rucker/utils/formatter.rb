@@ -29,18 +29,22 @@ module Rucker
   MOODS = {
     # creation
     adding:   :brg, creating: :brg, pulling:   :brg, sending:     :brg,
+    up:       :grn,
     # change
     updating: :brb, tagging:  :brb, pushing:   :brb, downloading: :brb,
     starting: :brb, unpausing: :brb, authing:  :brb,
+    ready:    :blu,
     # destruction
     stopping: :red, pausing:   :red,
     removing: :brr,
-    # self
-    as:       :cya, for:      :cya,
+    down:     :red,
+    clear:    :red,
     # other
     with:     :mag, to:       :mag, from: :mag,
     # alertness
     note:     :red, danger:   :brr, error: :brr, success: :brg,
+    # self
+    as:       :cya, on:      :cya,
   }
   # completed actions represent mild change
   %w[added created pulled pushed tagged removed
@@ -131,8 +135,8 @@ module Rucker
       :br_cyan    => ["\e[1;36m",   [ 49, 192, 181],  ],
       :br_white   => ["\e[1;37m",   [253, 246, 227],  ],
       #
-      :bold       => ["\e[1m",	    ],
-      :normal     => ["\e[0m",	    ],
+      :bold       => ["\e[1m",      ],
+      :normal     => ["\e[0m",      ],
     }
     {
       :blk => :black,                            :grn => :green,      :ylw => :yellow,

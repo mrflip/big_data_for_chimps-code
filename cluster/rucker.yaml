@@ -1,5 +1,17 @@
 local:
 
+  nodes:
+    control:
+      node_type:        't2.medium'
+      region:           'us-west-2'
+      instances:        1
+      containers:
+        - nn
+        - rm
+        - snn
+        - hue
+        - lounge
+
   images:
     # Community-accepted starting points we
     debian:            { repo_tag: 'library/debian:stable',              external: true, est_size: '154.7 MB' }
@@ -14,7 +26,7 @@ local:
     #
     baseimage:         { repo_tag: 'tutum.co/mrflip/baseimage:latest',  }
     volume_boxer:      { repo_tag: 'mrflip/volume_boxer:latest',  }
-    # lipstick:        { repo_tag: 'tutum.co/mrflip/lipstick:latest',  }
+    #
     hadoop_base:       { repo_tag: 'tutum.co/mrflip/hadoop_base:latest',  }
     hadoop_nn:         { repo_tag: 'tutum.co/mrflip/hadoop_nn:latest',  }
     hadoop_rm:         { repo_tag: 'tutum.co/mrflip/hadoop_rm:latest',  }
@@ -22,6 +34,7 @@ local:
     hadoop_hue:        { repo_tag: 'tutum.co/mrflip/hadoop_hue:latest',  }
     hadoop_worker:     { repo_tag: 'tutum.co/mrflip/hadoop_worker:latest',  }
     hadoop_lounge:     { repo_tag: 'tutum.co/mrflip/hadoop_lounge:latest',  }
+    # lipstick:        { repo_tag: 'tutum.co/mrflip/lipstick:latest',  }
     #
     data_gold:         { repo_tag: 'mrflip/data_gold:latest',   'kind': 'data' }
     data_hdfs0:        { repo_tag: 'mrflip/data_hdfs0:latest',  'kind': 'data' }
@@ -83,48 +96,50 @@ local:
       #   volumes_from:
       #     - home_chimpy
 
-      hadoop_nn:
+      nn:
         image_name:   'hadoop_nn'
         hostname:     'nn'
         # console http 50070; ipc 8020
         ports:         [ '9522:22~ssh', '50070:50070~view', '8020:8020~ipc' ]
         volumes_from:
           - data_nn
+        # links:
+        #   - 'hostname_bot:hostname_bot'
         volumes:
            # dynamic /etc/hosts file
           - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
           - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      hadoop_snn:
+      snn:
         image_name: 'hadoop_snn'
         hostname:     'snn'
         # checkpoint api http 50090
         ports:         [ '9422:22~ssh', '50090~ipc' ]
         links:
-          - 'hadoop_nn:nn'
+          - 'nn:nn'
         volumes:
           - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
           - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      hadoop_rm:
+      rm:
         image_name: 'hadoop_rm'
         hostname:     'rm'
         # rsrc mgr: console http 8088; scheduler 8030; tracker 8031; ipc 8032; admin 8033, shuffle 13562;
         # history:  console 19888 / https 19890, ipc 10020, admin 10033
         ports:         [ '9322:22~ssh', '8088:8088~view', '8030:8030~sched', '8031:8031~tracker', '8032:8032~ipc', '8033:8033~yarnad', '13562:13562~shuffle', '19888:19888~histview', '10020:10020~ipc', '10033:10033~histad' ]
         links:
-          - 'hadoop_nn:nn'
+          - 'nn:nn'
         volumes:
           - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
           - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      # hadoop_jt:
+      # jt:
       #   image_name: 'hadoop_jt'
       #   hostname:     'jt'
       #   # 
       #   ports:         [ '9222:22~ssh', '50030:50030~view', '8021:8021~ipc', '9290:9290~thrift' ]
       #   links:
-      #     - 'hadoop_nn:nn'
+      #     - 'nn:nn'
       #   volumes:
       #     - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
       #     - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
@@ -133,15 +148,15 @@ local:
       # TODO: We have hardcoded port mappings to the first docker host, which is
       # convenient. It also however forces us to have a one-worker-only cluster.
       #
-      hadoop_worker00:
+      worker00:
         image_name: 'hadoop_worker'
         # node mgr:  console http 8042, localizer 8040, ipc 8041
         # data node: console http 50075, ipc 50020, xceiver 50010
         ports:         [ '9122:22~ssh', '8042:8042~nmview', '50075:50075~dnview', '50060:50060~tt', '8040~lclzr', '8041~nmipc', '50020~dnipc', '50010~dnxceiver' ]
         links:
-          - 'hadoop_nn:nn'
-          - 'hadoop_rm:rm'
-          # - 'hadoop_jt:jt'
+          - 'nn:nn'
+          - 'rm:rm'
+          # - 'jt:jt'
         volumes:
           - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
           - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
@@ -150,7 +165,7 @@ local:
         hostname:     'worker00'
 
       #
-      hadoop_hue:
+      hue:
         image_name: 'hadoop_hue'
         hostname:     'hue'
         ports:         [ '9622:22~ssh', '10000:10000~hue' ]
@@ -162,16 +177,16 @@ local:
           - 'data_hue'
           - 'home_chimpy'
         links:
-          - 'hadoop_nn:nn'
-          - 'hadoop_rm:rm'
+          - 'nn:nn'
+          - 'rm:rm'
           # - 'lipstick:lipstick'
-          - 'hadoop_worker00:worker00'
-          # - 'hadoop_jt:jt'
+          - 'worker00:worker00'
+          # - 'jt:jt'
 
       #
       # Running hue on the lounge so that there's only one URL users need to learn.
       #
-      hadoop_lounge:
+      lounge:
         image_name: 'hadoop_lounge'
         hostname:     'lounge'
         ports:         [ '9022:22~ssh' ]
@@ -184,12 +199,12 @@ local:
           - 'data_outd'
           - 'home_chimpy'
         links:
-          - 'hadoop_nn:nn'
-          - 'hadoop_rm:rm'
+          - 'nn:nn'
+          - 'rm:rm'
           # - 'lipstick:lipstick'
-          - 'hadoop_worker00:worker00'
-          - 'hadoop_hue:hue'
-          # - 'hadoop_jt:jt'
+          - 'worker00:worker00'
+          - 'hue:hue'
+          # - 'jt:jt'
 
   # extra ports to open up to allow expansion
   extra_ports:

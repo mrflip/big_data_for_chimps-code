@@ -33,7 +33,7 @@ module Rucker
 
       FIXUP_NAME_RE = %r{^/}
       def names()
-        info['Names'].map{|name| name.gsub(FIXUP_NAME_RE, '').to_sym }
+        ( info['Names'] || [] ).map{|name| name.gsub(FIXUP_NAME_RE, '').to_sym }
       end
 
       def ports()
@@ -66,7 +66,7 @@ module Rucker
         tm = ext_info['State']['StartedAt']
         (tm == '0001-01-01T00:00:00Z' ? nil : tm)
       end
-      # @return [Time] 
+      # @return [Time]
       def stopped_at()
         tm = ext_info['State']['FinishedAt']
         (tm == '0001-01-01T00:00:00Z' ? nil : tm)
@@ -93,6 +93,11 @@ module Rucker
         else                              :stopped
         end
       end
+
+      def absent?() state == :absent  ; end
+      def exists?() not absent?       ; end
+      def up?()     state == :running ; end
+      def ready?() [:running, :paused, :stopped].include?(state) ; end
 
       # Volume status
       # @return [Hash] hash with keys `name`, `path` and `writeable`
@@ -177,8 +182,12 @@ module Rucker
         }
       end
 
+      def self.all(opts={})
+        super({ 'all' => 'True' }.merge(opts))
+      end
+
       def start_from_manifest(ctr)
-        start(raw_start_hsh(ctr))
+        start!(raw_start_hsh(ctr))
       end
 
       def stop_from_manifest(ctr)
@@ -196,7 +205,7 @@ module Rucker
         end
       end
 
-      # @return [Hash] A hash of the essential attributes 
+      # @return [Hash] A hash of the essential attributes
       def to_wire
         state_hsh = parse_status_str(status_str)
         hsh = {
@@ -229,12 +238,12 @@ module Rucker
       # #
       # # These are dupes of methods in Docker-api just to get subclasses right.
       # #
-      # 
+      #
       # # Return a String representation of the Container.
       # def to_s
       #   "#{self.class.name} { :id => #{self.id}, :connection => #{self.connection} }"
       # end
-      # 
+      #
       # # Create an Image from a Container's change.s
       # def commit(options = {})
       #   options.merge!('container' => self.id[0..7])

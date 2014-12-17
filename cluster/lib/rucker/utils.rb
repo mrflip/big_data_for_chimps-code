@@ -43,7 +43,7 @@ module Rucker
       raise(ArgumentError, "Could not parse image repo_tag #{repo_tag}")
     end
   end
-  
+
   # Sorts repo_tag names in order by
   #
   # * slug, since equivalent slugs imply equivalent functions; then
@@ -93,7 +93,7 @@ module Rucker
   #
   # Config stuff, which lives too much everywhere.
   #
-  
+
   def self.verbose=(val)
     @verbose = val
   end
@@ -168,6 +168,29 @@ end
 #
 
 module Gorillib
+  module Model
+
+    # override to_inspectable (not this) in your descendant class
+    # @return [String] Human-readable presentation of the attributes
+    def inspect
+      str = []
+      str << self.class.name.to_s << '('
+      attrs = to_inspectable
+      if attrs.present?
+        str << attrs.map do |attr, val|
+          val_str = val.respond_to?(:inspect_compact) ? val.inspect_compact : val.inspect
+          "#{attr}:#{val_str}"
+        end.join(' ')
+      end
+      str << ')'
+      str.join
+    end
+
+    def extra_attrs
+      instance_variable_get(:@_extra_attributes) if instance_variable_defined?(:@_extra_attributes)
+    end
+  end
+
   Model::ClassMethods.module_eval do
     def receive(attrs={}, &block)
       return nil if attrs.nil?
@@ -180,14 +203,31 @@ module Gorillib
       #
       klass.new(attrs, &block)
     end
+
+    def collection(field_name, collection_type, opts={})
+      item_type = opts[:item_type] = opts.delete(:of) if opts.has_key?(:of)
+      opts = opts.reverse_merge(
+        default: ->{ collection_type.new(item_type: item_type, belongs_to: self) } )
+      fld = field(field_name, collection_type, opts)
+      define_collection_receiver(fld)
+      fld
+    end
   end
-  
+
+  Model::Field.class_eval do
+    field :aka, :array, of: :symbol, default: ->(){ Array.new }, doc: 'other keys to receive into this field'
+    def receive_aka(val)
+      super(Array.wrap(val))
+    end
+  end
+
   module AccessorFields
     extend Gorillib::Concern
 
     def handle_extra_attributes(attrs)
+      attrs.symbolize_keys!
       accessor_fields.each do |fn|
-        instance_variable_set(:"@#{fn}", attrs.delete(fn)) if attrs.include?(fn)
+        self.send("receive_#{fn}", attrs.delete(fn)) if attrs.include?(fn)
       end
       super
     end
@@ -197,10 +237,11 @@ module Gorillib
         opts = opts.reverse_merge(reader: :protected, writer: false)
         name = name.to_sym
         #
-        attr_reader name if opts[:reader] 
+        attr_reader name if opts[:reader]
         attr_writer name if opts[:writer]
         ivar_name = :"@#{name}"
         define_method(:"unset_#{name}"){ remove_instance_variable(ivar_name) if instance_variable_defined?(ivar_name) }
+        define_method(:"receive_#{name}"){|val| instance_variable_set(:"@#{name}", val) }
         #
         [ [name, opts[:reader]], ["#{name}=", opts[:writer]] ].each do |meth, visibility|
           case visibility
@@ -221,6 +262,6 @@ module Gorillib
         self.accessor_fields = []
       end
     end
-    
+
   end
 end

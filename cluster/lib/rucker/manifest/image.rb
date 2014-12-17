@@ -50,14 +50,15 @@ module Rucker
       # @return self
       def forget()
         unset_parsed_repo_tag
-        self
       end
 
       #
       # Actions
       #
 
+      def up?()     exists? ; end
       def ready?()  exists? ; end
+      def down?()   absent? ; end
       def clear?()  absent? ; end
 
       def exists?() state == :exists ; end

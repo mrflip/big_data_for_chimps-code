@@ -119,8 +119,12 @@ module Rucker
       add(item)
     end
 
+    def attributes
+      { belongs_to: self.belongs_to, item_type: self.item_type }
+    end
+
     def new_empty_collection
-      self.class.new(belongs_to: self.belongs_to, item_type: self.item_type)
+      self.class.new(attributes)
     end
 
     # @return items with the given keys, or all items for the special key `:_all`
@@ -201,7 +205,7 @@ module Rucker
     end
 
     def inspect_compact
-      ["c{ ", keys.count, ' }'].join
+      ["[ ", keys.count, ' ]'].join
     end
 
     # @return [Array] serializable array representation of the collection

@@ -7,6 +7,7 @@ module Rucker
       field :name, :symbol, default: :world
       field :layout_file, :string
       #
+      collection :nodes,       Rucker::Manifest::NodeCollection
       collection :clusters,    Rucker::Manifest::ClusterCollection
       collection :images,      Rucker::Manifest::ImageCollection
       collection :extra_ports, Rucker::Manifest::PortBindingCollection
@@ -26,7 +27,7 @@ module Rucker
       end
 
       def refresh!
-        remove_instance_variable :@ports if instance_variable_defined?(:@ports)
+        nodes.refresh!
         images.refresh!
         containers.refresh!
         containers.each{|ctr| ctr.image = images[ctr.image_name] or Rucker.warn "No image '#{ctr.image_name}' defined for container #{ctr}. Check #{layout_file}"}
@@ -85,7 +86,6 @@ module Rucker
       end
 
       def ports
-        return @ports if instance_variable_defined?(:@ports)
         ports_coll = Rucker::Manifest::PortBindingCollection.new(belongs_to: self)
         ports_coll.receive!(extra_ports.items)
         containers.each{|ctr| ports_coll.receive!(ctr.ports.items) }
