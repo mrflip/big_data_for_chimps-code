@@ -45,6 +45,7 @@ team_pkyr_bags = FOREACH (GROUP park_team_years BY team_id) GENERATE
 
 DESCRIBE team_pkyr_bags;
 
+
 /* 
 
 team_pkyr_bags: {
@@ -57,6 +58,7 @@ team_pkyr_bags: {
     }
 }
 */
+
 
 team_yr_parks_g = GROUP park_team_years BY (year_id, team_id);
 
@@ -82,6 +84,7 @@ team_yr_parks_g: {
 }
 */
 
+
 year_team = FOREACH (GROUP park_team_years BY (year_id, team_id)) GENERATE FLATTEN(group) AS (year_id, team_id);
 
 DESCRIBE year_team
@@ -93,6 +96,8 @@ year_team: {
 }
 */
 
+
+-- Counting Occurrences of a Key
 team_n_parks = FOREACH (GROUP park_team_years BY (team_id,year_id)) GENERATE
     group.team_id, 
     COUNT_STAR(park_team_years) AS n_parks;
@@ -108,6 +113,8 @@ team_n_parks: {
 
 vagabonds = FILTER team_n_parks BY n_parks >= 3;
 
+
+-- Representing Collections as Delimited Strings
 team_year_w_parks = FOREACH (GROUP park_team_years BY (team_id, year_id)) GENERATE
     group.team_id,
     COUNT_STAR(park_team_years) AS n_parks,
@@ -118,6 +125,8 @@ DESCRIBE team_year_w_parks;
 top_team_year_w_parks = ORDER team_year_w_parks BY n_parks DESC;
 -- top_20 = LIMIT top_team_year_w_parks 20; DUMP @;
 
+
+-- Representing Complex Data Structures
 team_year_w_pkgms = FOREACH (GROUP park_team_years BY (team_id, year_id)) {
     /* Create 'park ID'/'game count' field */
     pty_ordered     = ORDER park_team_years BY n_games DESC;
@@ -134,6 +143,7 @@ top_team_parks = ORDER team_year_w_pkgms BY n_parks DESC;
 -- STORE top_20 INTO 'park_teams_report';
 
 
+-- Representing a Complex Data Structure using JSON
 pktm_city = FOREACH park_team_years GENERATE
     team_id, 
     year_id, 
@@ -155,9 +165,11 @@ pktm_stats = FOREACH (GROUP pktm_city BY (team_id, year_id, city)) {
         BagToString(pk_ct_pairs,'|') AS parks
         ;
 };
--- top_parks = ORDER pktm_stats BY n_parks DESC; DUMP @;
+top_parks = ORDER pktm_stats BY n_parks DESC; 
+a = limit top_parks 20; DUMP @;
 
 
+-- Storing complex data as JSON
 farhome_gms = FOREACH (GROUP pktm_stats BY (team_id, year_id)) {
     pty_ordered   = ORDER   pktm_stats BY n_city_games DESC;
     city_pairs    = FOREACH pty_ordered GENERATE CONCAT(city, ':', (chararray)n_city_games);
