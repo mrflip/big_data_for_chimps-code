@@ -1,7 +1,219 @@
 module Rucker
   module Tutum
     #
-    class TutumService < TutumBase
+    class TutumService < ::Tutum::Service
+      #
+      # Actions
+      #
+
+
+      # All names this may be known by
+      def names() [ name.to_sym ] ; end
+
+      # def exists?
+      #   not [:terminated, :terminating, :absent].include?(state)
+      # end
+
+      def self.all
+        list()
+      end
+
+      def start_using_manifest(ctr)
+        start
+      end
+
+      def stop_using_manifest(ctr)
+        stop
+      end
+
+      def remove_using_manifest(ctr)
+        terminate
+      end
+
+      # Create a service from a manifest
+      #
+      def self.create_using_manifest(ctr)
+        hsh = {
+          name:            ctr.name,
+          image:           ctr.image_repo_tag,
+          target_num_containers: 1,
+          #
+          container_ports:   ports_hsh(ctr),
+          container_envvars: envs_hsh(ctr),
+          linked_to_service: links_hsh(ctr),
+          autorestart:     'OFF',
+          autoreplace:     'OFF',
+          autodestroy:     'OFF',
+          tags:            [ { name: ctr.name } ],
+          # roles:           [],
+          # privileged:      false,
+          # sequential_deployment: false,
+        }
+        hsh[:entrypoint]  = Shellwords.join(ctr.entrypoint) if ctr.entrypoint.present?
+        hsh[:run_command] = Shellwords.join(ctr.entry_args) if ctr.entry_args.present?
+        self.create(hsh)
+      end
+
+      # @example
+      #   [{"protocol": "tcp", "inner_port": 80, "outer_port": 80}]
+      def self.ports_hsh(ctr)
+        ctr.ports.map do |port|
+          { protocol: port.proto, inner_port: port.cport, outer_port: port.hport,
+            port_name: port.desc, published: port.published?.to_s }
+        end
+      end
+
+      # @example
+      #   [{"to_service": "/api/v1/service/80ff1635-2d56-478d-a97f-9b59c720e513/", "name": "db"}]
+      def self.links_hsh(ctr)
+        ctr.linked_containers.map do |as_name, other|
+          { to_service: other.actual.resource_uri,
+            name: as_name
+          }
+        end
+      end
+
+      # @example
+      #   [{"key": "DB_PASSWORD", "value": "mypass"}]
+      def self.envs_hsh(ctr)
+        ctr.envs.map do |env_str|
+          key, val = env_str.split('=', 2)
+          { key: key, value: val }
+        end
+      end
+
+      # def receive_state(val)
+      #   val = val.to_s.downcase.gsub(/[^\w]+/, '_')
+      #   val =
+      #     case val
+      #     when /partly.*runn/ then :partly
+      #     when /terminat.*/   then :absent
+      #     else                     val
+      #     end
+      #   super(val)
+      # end
+      #
+      # def receive_ports(vals)
+      #   vals.each do |val|
+      #     if val.is_a?(Hash)
+      #       val.symbolize_keys!
+      #       val[:desc]  ||= val.delete(:port_name)  if val.include?(:port_name)
+      #       val[:cport] ||= val.delete(:inner_port) if val.include?(:inner_port)
+      #       val[:hport] ||= val.delete(:outer_port) if val.include?(:outer_port)
+      #       val[:proto] ||= val.delete(:protocol)   if val.include?(:protocol)
+      #       val.delete(:published)
+      #     end
+      #   end
+      #   super(vals)
+      # end
+
+      # Init            The service has been created and has no deployed containers yet. Possible actions in this state: start, terminate.
+      # Starting        All containers for the service are either starting or already running. No actions allowed in this state.
+      # Running         All containers for the service are deployed and running. Possible actions in this state: stop, redeploy, terminate.
+      # Partly running  One or more containers of the service are deployed and running. Possible actions in this state: stop, redeploy, terminate.
+      # Scaling         The service is either deploying new containers or destroying existing ones responding to a scaling request. No actions allowed in this state.
+      # Redeploying     The service is redeploying all its containers with the updated configuration. No actions allowed in this state.
+      # Stopping        All containers for the service are either stopping or already stopped. No actions allowed in this state.
+      # Stopped         All containers for the service are stopped. Possible actions in this state: start, redeploy, terminate.
+      # Absent          (Terminating) All containers for the service are either being terminated or already terminated. No actions allowed in this state.
+      # Absent          (Terminated)  The service and all its containers have been terminated. No actions allowed in this state.
+      # Not running     There are no containers to be deployed for this service. Possible actions in this state: terminate.
+
+      # def handle_extra_attributes(attrs)
+      #   attrs.symbolize_keys!
+      #   self.class.fields.each do |fn, fld|
+      #     fld.aka.each do |alt_fn|
+      #       self.send("receive_#{fn}", attrs.delete(alt_fn)) if attrs.include?(alt_fn)
+      #     end
+      #   end
+      #   super(attrs)
+      #   %w[ cpu_shares deployment_strategy memory privileged run_command sequential_deployment
+      #     autodestroy autoreplace autorestart
+      #   ].each{|attr| attrs.delete(attr.to_sym) }
+      # end
+      #
+      # EXTENDED_ATTRS = [:actions, :bindings, :envs, :container_ids,
+      #   :linked_envs, :links, :links_from, :roles,
+      #   :tags, :webhooks, ]
+      # # These require an extra get before we know their value
+      # def read_unset_attribute(field_name)
+      #   if EXTENDED_ATTRS.include?(field_name)
+      #     refresh!
+      #     return read_attribute(field_name) if attribute_set?(field_name)
+      #   end
+      #   super
+      # end
+      #
+      # # Stop the service's containers
+      # #
+      # def stop
+      #   connection.services.stop(id)
+      #   forget
+      # end
+      #
+      # # Start the service's containers
+      # #
+      # def start
+      #   unless [:init, :stopped].include?(state)
+      #     return(warn "Cannot start #{self.name} from state #{state}")
+      #   end
+      #   connection.services.start(id)
+      #   forget
+      # end
+      #
+      # # Change the number of containers running
+      # #
+      # def adjust_count(new_count)
+      #   self.target_num_containers = new_count
+      #   connection.services.update(target_num_containers: target_num_containers)
+      #   forget
+      # end
+      #
+      # # Upgrade the service to the latest version of the image tag
+      # #
+      # def redeploy
+      #   connection.services.redeploy(id)
+      #   forget
+      # end
+      #
+      # # Terminate service's existence
+      # #
+      # def remove(opts={})
+      #   connection.services.terminate(id)
+      #   forget
+      # end
+      #
+      # # See logs
+      # #
+      # def logs
+      # end
+      #
+      # # Create another service just like this one
+      # #
+      # def self.duplicate(tut_ctr)
+      #   result = connection.services.create(tut_ctr.to_tutum_hsh)
+      #   self.receive(result)
+      # end
+
+
+      # def to_tutum_hsh
+      #   attrs = self.attributes
+      #   self.class.fields.each do |fn, fld|
+      #     fld.aka.each do |alt_fn|
+      #       attrs[alt_fn] = attrs.delete(fn)
+      #     end
+      #   end
+      #   attrs
+      # end
+
+      def id()  uuid ; end
+
+      def linked_envs()  link_variables ; end
+      def ctrs_current() current_num_containers() ;  end
+      def ctrs_running() running_num_containers() ;  end
+      def ctrs_stopped() stopped_num_containers() ;  end
+      def ctrs_target()  target_num_containers()  ;  end
+
       # field :name,           :symbol
       # field :id,             :string,  aka: :uuid,                  doc: 'A unique identifier generated automatically on creation'
       # field :tutum_uri,      :string,  aka: :resource_uri,          doc: 'The unique API endpoint that represents the container'
@@ -53,13 +265,6 @@ module Rucker
       #
       # accessor_field :containers, :array, writer: false
 
-      # # All names this may be known by
-      # def names() [ name ] ; end
-
-      # def exists?
-      #   not [:terminated, :terminating, :absent].include?(state)
-      # end
-
       # # List all services
       # #
       # def self.all(opts={})
@@ -91,196 +296,6 @@ module Rucker
       #   return @containers if instance_variable_defined?(:@containers)
       #   @containers = container_ids.map{|cid| connection.containers.get(cid) }
       # end
-
-      # Paper over some differences in API docker vs this
-      def start_from_manifest(ctr)       ; start       ; end
-      def stop_from_manifest(ctr)        ; stop        ; end
-      def remove_from_manifest(ctr)      ; remove      ; end
-      def self.create_from_manifest(ctr) ; create(ctr) ; end
-
-      #
-      # Actions
-      #
-
-      # Stop the service's containers
-      #
-      def stop
-        connection.services.stop(id)
-        forget
-      end
-
-      # Start the service's containers
-      #
-      def start
-        unless [:init, :stopped].include?(state)
-          return(warn "Cannot start #{self.name} from state #{state}")
-        end
-        connection.services.start(id)
-        forget
-      end
-
-      # Change the number of containers running
-      #
-      def adjust_count(new_count)
-        self.target_num_containers = new_count
-        connection.services.update(target_num_containers: target_num_containers)
-        forget
-      end
-
-      # Upgrade the service to the latest version of the image tag
-      #
-      def redeploy
-        connection.services.redeploy(id)
-        forget
-      end
-
-      # Terminate service's existence
-      #
-      def remove(opts={})
-        connection.services.terminate(id)
-        forget
-      end
-
-      # See logs
-      #
-      def logs
-      end
-
-      # Create another service just like this one
-      #
-      def self.duplicate(tut_ctr)
-        result = connection.services.create(tut_ctr.to_tutum_hsh)
-        self.receive(result)
-      end
-
-      # Create a service from a manifest
-      #
-      def self.create(ctr)
-        hsh = {
-          name:            ctr.name,
-          image:           ctr.image_repo_tag,
-          target_num_containers: 1,
-          #
-          container_ports: ports_hsh(ctr),
-          container_envvars: envs_hsh(ctr),
-          linked_to_service: links_hsh(ctr),
-          autorestart:     'OFF',
-          autoreplace:     'OFF',
-          autodestroy:     'OFF',
-          tags:            [ { name: ctr.name } ],
-          # roles:           [],
-          # privileged:      false,
-          # sequential_deployment: false,
-        }
-        hsh[:entrypoint]  = ctr.entrypoint  if ctr.entrypoint.present?
-        hsh[:run_command] = ctr.entry_args if ctr.entry_args.present?
-        p hsh
-        result = connection.services.create(hsh)
-        p result
-        self.receive(result)
-      end
-
-      # @example
-      #   [{"protocol": "tcp", "inner_port": 80, "outer_port": 80}]
-      def self.ports_hsh(ctr)
-        ctr.ports.map do |port|
-          { protocol: port.proto, inner_port: port.cport, outer_port: port.hport,
-            port_name: port.desc, published: port.published?.to_s }
-        end
-      end
-
-      #
-      # @example
-      #   [{"to_service": "/api/v1/service/80ff1635-2d56-478d-a97f-9b59c720e513/", "name": "db"}]
-      def self.links_hsh(ctr)
-        ctr.linked_containers.map do |as_name, other|
-          { to_service: other.actual.try(:tutum_uri),
-            name: as_name
-          }
-        end
-      end
-
-      # @example
-      #   [{"key": "DB_PASSWORD", "value": "mypass"}]
-      def self.envs_hsh(ctr)
-        ctr.envs.map do |env_str|
-          key, val = env_str.split('=', 2)
-          { key: key, value: val }
-        end
-      end
-
-      def to_tutum_hsh
-        attrs = self.attributes
-        self.class.fields.each do |fn, fld|
-          fld.aka.each do |alt_fn|
-            attrs[alt_fn] = attrs.delete(fn)
-          end
-        end
-        p attrs
-        attrs
-      end
-
-      # Init            The service has been created and has no deployed containers yet. Possible actions in this state: start, terminate.
-      # Starting        All containers for the service are either starting or already running. No actions allowed in this state.
-      # Running         All containers for the service are deployed and running. Possible actions in this state: stop, redeploy, terminate.
-      # Partly running  One or more containers of the service are deployed and running. Possible actions in this state: stop, redeploy, terminate.
-      # Scaling         The service is either deploying new containers or destroying existing ones responding to a scaling request. No actions allowed in this state.
-      # Redeploying     The service is redeploying all its containers with the updated configuration. No actions allowed in this state.
-      # Stopping        All containers for the service are either stopping or already stopped. No actions allowed in this state.
-      # Stopped         All containers for the service are stopped. Possible actions in this state: start, redeploy, terminate.
-      # Absent          (Terminating) All containers for the service are either being terminated or already terminated. No actions allowed in this state.
-      # Absent          (Terminated)  The service and all its containers have been terminated. No actions allowed in this state.
-      # Not running     There are no containers to be deployed for this service. Possible actions in this state: terminate.
-
-      def receive_state(val)
-        val = val.to_s.downcase.gsub(/[^\w]+/, '_')
-        val =
-          case val
-          when /partly.*runn/ then :partly
-          when /terminat.*/   then :absent
-          else                     val
-          end
-        super(val)
-      end
-
-      def receive_ports(vals)
-        vals.each do |val|
-          if val.is_a?(Hash)
-            val.symbolize_keys!
-            val[:desc]  ||= val.delete(:port_name)  if val.include?(:port_name)
-            val[:cport] ||= val.delete(:inner_port) if val.include?(:inner_port)
-            val[:hport] ||= val.delete(:outer_port) if val.include?(:outer_port)
-            val[:proto] ||= val.delete(:protocol)   if val.include?(:protocol)
-            val.delete(:published)
-          end
-        end
-        super(vals)
-      end
-
-      def handle_extra_attributes(attrs)
-        attrs.symbolize_keys!
-        self.class.fields.each do |fn, fld|
-          fld.aka.each do |alt_fn|
-            self.send("receive_#{fn}", attrs.delete(alt_fn)) if attrs.include?(alt_fn)
-          end
-        end
-        super(attrs)
-        %w[ cpu_shares deployment_strategy memory privileged run_command sequential_deployment
-          autodestroy autoreplace autorestart
-        ].each{|attr| attrs.delete(attr.to_sym) }
-      end
-
-      EXTENDED_ATTRS = [:actions, :bindings, :envs, :container_ids,
-        :linked_envs, :links, :links_from, :roles,
-        :tags, :webhooks, ]
-      # These require an extra get before we know their value
-      def read_unset_attribute(field_name)
-        if EXTENDED_ATTRS.include?(field_name)
-          refresh!
-          return read_attribute(field_name) if attribute_set?(field_name)
-        end
-        super
-      end
 
     end
   end

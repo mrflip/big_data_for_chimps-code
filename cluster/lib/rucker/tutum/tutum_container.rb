@@ -1,7 +1,7 @@
 module Rucker
   module Tutum
     #
-    class TutumService < TutumBase
+    class TutumContainer < ::Tutum::Container
     end
     #
   end

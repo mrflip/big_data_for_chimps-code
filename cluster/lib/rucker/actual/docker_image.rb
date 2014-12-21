@@ -4,7 +4,7 @@ module Rucker
     #
     # We're not breaking caching rules here, just adding sugar
     #
-    class ActualImage < Docker::Image
+    class DockerImage < ::Docker::Image
 
       #
       def untagged?()  repo_tags == ["<none>:<none>"] ; end

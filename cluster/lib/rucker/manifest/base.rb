@@ -4,13 +4,13 @@ module Rucker
 
     module HasState
       def state_desc
-        states = Array.wrap(state)
+        states = Array.wrap(state).flatten.uniq
         case
         when states == []       then "missing anything to report state of"
         when states.length == 1 then states.first.to_s
         else
           fin = states.pop
-          "a mixture of #{states.join(', ')} and #{fin} states"
+          "a mixture of #{states.join(', ')} and #{fin.to_s} states"
         end
       end
 
@@ -24,7 +24,7 @@ module Rucker
       def restart?() Array.wrap(state) == [:restart] ; end
       def absent?()  Array.wrap(state) == [:absent ] ; end
 
-      def consistent?() Array.wrap(state).length == 1 ; end
+      def consistent?() Array.wrap(state).flatten.uniq.length == 1 ; end
     end
 
     class Base

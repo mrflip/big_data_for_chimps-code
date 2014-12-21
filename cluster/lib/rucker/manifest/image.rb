@@ -8,7 +8,7 @@ module Rucker
       field :kind,        :symbol,  doc: 'should have the value :data, for containers-used-as-volumes'
       field :est_size,    :string,  doc: 'An advisory statement of the actual image size.'
       #
-      accessor_field :actual, Rucker::Actual::ActualImage, writer: true
+      accessor_field :actual, Rucker::Actual::DockerImage, writer: true
       # protected :actual
       accessor_field :parsed_repo_tag
       #
@@ -17,21 +17,21 @@ module Rucker
       # An image can have multiple tags -- for example, `library/debian:stable` and
       # `library/debian:jessie` are currently identical.
       #
-      # @see Rucker::Actual::ActualImage#repo_tags
+      # @see Rucker::Actual::DockerImage#repo_tags
       # @return [Array[String]] All repo_tag that have the same final layer as this image
       def repo_tags()  actual.try(:repo_tags) || [] ; end
 
-      # @see Rucker::Actual::ActualImage#id
+      # @see Rucker::Actual::DockerImage#id
       # @return [String] ID for this image as a long hexadecimal string
       def id()         actual.try(:id) || ''  ; end
       # @return [String] ID for this image as a 13-character hexadecimal string
       def short_id()   id[0..12]              ; end
 
-      # @see Rucker::Actual::ActualImage#created_at
+      # @see Rucker::Actual::DockerImage#created_at
       # @return [Time] Creation time of this image
       def created_at() actual.try(:created_at) ; end
 
-      # @see Rucker::Actual::ActualImage#size
+      # @see Rucker::Actual::DockerImage#size
       # @return [Integer] Size of all layers that comprise this image
       def size()       actual.try(:size) ; end
 
@@ -60,6 +60,8 @@ module Rucker
       def ready?()  exists? ; end
       def down?()   absent? ; end
       def clear?()  absent? ; end
+
+      def at_goal?(goal) self.send("#{goal}?") ; end
 
       def exists?() state == :exists ; end
       def absent?() state == :absent ; end
@@ -104,7 +106,7 @@ module Rucker
         p [rt, creds]
         #
         Rucker.progress(:pulling, self, from: rt[:repo_tag], as: self.repo_tag, note: "This can take a really long time.")
-        actual = Rucker::Actual::ActualImage.pull_by_name(
+        actual = Rucker::Actual::DockerImage.pull_by_name(
           rt[:registry], rt[:family], rt[:tag], creds[:docker_str],
           &method(:interpret_chunk))
         #
@@ -248,7 +250,7 @@ module Rucker
         if self.actual.present?
           self.actual.refresh!
         else
-          self.actual = Rucker::Actual::ActualImage.get(repo_tag)
+          self.actual = Rucker::Actual::DockerImage.get(repo_tag)
         end
         self
       rescue Docker::Error::NotFoundError => err
@@ -430,7 +432,7 @@ module Rucker
         # Reset all the images
         each{|img| img.forget ; img.unset_actual }
         # Gift the actual image to each manifest that refers to it.
-        Rucker::Actual::ActualImage.all().map do |actual|
+        Rucker::Actual::DockerImage.all().map do |actual|
           next if actual.untagged?
           actual.repo_tags.each do |rt|
             items.each do |img|

@@ -24,17 +24,17 @@ end
 # World
 #
 
-desc "Brings all clusters up to running state"
+desc "Bring world to running state"
 container_task :up do |names, opts|
   Rucker.world.containers_slice(names || :_all).up
 end
 
-desc "Brings all clusters up to stopped state if absent; ignores paused or running containers"
+desc "Bring world into existence"
 container_task :ready do |names, opts|
   Rucker.world.containers_slice(names || :_all).ready
 end
 
-desc "Brings all clusters down to stopped state (if running or paused); ignores absent containers"
+desc "Brings world down to stopped state (if running or paused); ignores absent containers"
 container_task :down do |names, opts|
   Rucker.world.containers_slice(names || :_all).down
 end
@@ -45,7 +45,7 @@ container_task :nuke_from_orbit do |names, opts|
   Rucker.world.containers_slice(names).clear
 end
 
-desc "Destroys all containers -- all of them -- from any initial state."
+desc "Display logs for named container"
 container_task :logs do |names, opts|
   names = Rucker.expect_some('container', names)
   Rucker.world.containers_slice(names).logs
@@ -64,36 +64,36 @@ task :dump do
 end
 
 
+# #
+# # Tasks on each cluster
+# #
+# def cluster_tasks(cl_name)
+#   namespace cl_name do
+#     desc "Bring the #{cl_name} cluster up to running state; Can optionally supply '+' delimited container names"
+#     container_task(:up) do |names, opts|
+#       Rucker.world.cluster(cl_name).containers_slice(names || :_all).up
+#     end
 #
-# Tasks on each cluster
+#     desc "Brings the #{cl_name} cluster up to stopped state if absent; ignores paused or running containers. Can optionally supply '+' delimited container names"
+#     container_task(:ready) do |names, opts|
+#       Rucker.world.cluster(cl_name).containers_slice(names || :_all).ready
+#     end
 #
-def cluster_tasks(cl_name)
-  namespace cl_name do
-    desc "Bring the #{cl_name} cluster up to running state; Can optionally supply '+' delimited container names"
-    container_task(:up) do |names, opts|
-      Rucker.world.cluster(cl_name).containers_slice(names || :_all).up
-    end
-
-    desc "Brings the #{cl_name} cluster up to stopped state if absent; ignores paused or running containers. Can optionally supply '+' delimited container names"
-    container_task(:ready) do |names, opts|
-      Rucker.world.cluster(cl_name).containers_slice(names || :_all).ready
-    end
-
-    desc "Brings the #{cl_name} down to stopped state (if running or paused); ignores absent containers. Can optionally supply '+' delimited container names"
-    container_task(:down) do |names, opts|
-      Rucker.world.cluster(cl_name).containers_slice(names || :_all).down
-    end
-
-    desc "Destroys all containers in the #{cl_name} cluster -- all of them -- from any initial state, and without consideration for other cluster's wants or needs or feelings; must supply '+' delimited container names, or 'all' to nuke all."
-    container_task(:nuke_from_orbit) do |names, opts|
-      names = Rucker.expect_some('container', names)
-      Rucker.world.cluster(cl_name).containers_slice(names).clear
-    end
-  end
-end
-cluster_tasks(:hadoop)
-cluster_tasks(:helpers)
-cluster_tasks(:data)
+#     desc "Brings the #{cl_name} down to stopped state (if running or paused); ignores absent containers. Can optionally supply '+' delimited container names"
+#     container_task(:down) do |names, opts|
+#       Rucker.world.cluster(cl_name).containers_slice(names || :_all).down
+#     end
+#
+#     desc "Destroys all containers in the #{cl_name} cluster -- all of them -- from any initial state, and without consideration for other cluster's wants or needs or feelings; must supply '+' delimited container names, or 'all' to nuke all."
+#     container_task(:nuke_from_orbit) do |names, opts|
+#       names = Rucker.expect_some('container', names)
+#       Rucker.world.cluster(cl_name).containers_slice(names).clear
+#     end
+#   end
+# end
+# cluster_tasks(:hadoop)
+# cluster_tasks(:helpers)
+# cluster_tasks(:data)
 
 namespace :images do
 
@@ -315,13 +315,13 @@ task :adventure do
   world = Rucker.world
   Rucker.banner('Adventure')
   Rucker.output "  You are in a dockyard of some kind."
-  Rucker.output "  A burly stevedore stands before ", :brc, "#{world.clusters.items.count} clusters", " of ", :brc, "#{world.containers.items.count} containers", " hefting a gaff,"
+  Rucker.output "  A burly stevedore stands before ", :brc, "#{world.nodes.items.count} stacks", " of ", :brc, "#{world.containers.items.count} containers", " hefting a gaff,"
   Rucker.output "  and a seedy-looking grifter leans agains a photo booth labelled '", :brc, "#{world.images.items.count} images", "',"
   Rucker.output "  picking her teeth with a stiletto."
   Rucker.output
   Rucker.output "  The scrolling marquee overhead reads '", :brg, world.state_desc, "'."
   Rucker.output "  Paths lead ", :brr, 'up', ' and ', :brr, 'down', '.'
-  if world.absent? then Rucker.output "  It is dark. ", :brk, 'You are likely to be eaten by a grue.' ; end
+  if world.containers.absent? then Rucker.output "  It is dark. ", :brk, 'You are likely to be eaten by a grue.' ; end
   Rucker.output ""
   world.pry
 end
@@ -357,4 +357,3 @@ end
 task :default do
   abort "Please specify a task name, like 'rake ps' or 'rake up'.\nTo see the list of tasks, run 'rake -T'.\nFor more help, run 'rake --help'."
 end
-

@@ -32,7 +32,7 @@ module Rucker
     up:       :grn,
     # change
     updating: :brb, tagging:  :brb, pushing:   :brb, downloading: :brb,
-    starting: :brb, unpausing: :brb, authing:  :brb,
+    starting: :brb, unpausing: :brb, authing:  :brb, ran: :brb,
     ready:    :blu,
     # destruction
     stopping: :red, pausing:   :red,
@@ -40,6 +40,7 @@ module Rucker
     down:     :red,
     clear:    :red,
     # other
+    state:    :mag,
     with:     :mag, to:       :mag, from: :mag,
     # alertness
     note:     :red, danger:   :brr, error: :brr, success: :brg,
@@ -102,7 +103,7 @@ module Rucker
     end
 
     # @example
-    #   format("This is ", :red, "crimson", " text")
+    #   format("This is ", :red, "crimson text", " and this is normal text")
     def format(*texts)
       out = []
       while texts.present?

@@ -25,9 +25,13 @@ require_relative 'rucker/utils/formatter'
 require_relative 'rucker/utils'
 require_relative 'rucker/keyed_collection'
 #
-require_relative 'rucker/actual/actual_container'
-require_relative 'rucker/actual/actual_image'
+require_relative 'rucker/actual/docker_container'
+require_relative 'rucker/actual/docker_image'
+require_relative 'rucker/actual/tutum_node'
+require_relative 'rucker/actual/boot2d_node'
+require_relative 'rucker/actual/local_node'
 #
+require_relative 'rucker/state'
 require_relative 'rucker/manifest/base'
 require_relative 'rucker/manifest/port_binding'
 require_relative 'rucker/manifest/image'
@@ -72,8 +76,14 @@ module Rucker
 
 
   def self.provider
-    # Rucker::Actual::ActualContainer
-    Rucker::Tutum::TutumService
+    # Rucker::Tutum::TutumService
+    Rucker::Actual::DockerContainer
+  end
+
+  def self.node_provider
+    # Rucker::Actual::TutumNode
+    # Rucker::Actual::Boot2dNode
+    Rucker::Actual::LocalNode
   end
 
   def self.tutum

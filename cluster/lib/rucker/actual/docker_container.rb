@@ -5,7 +5,7 @@ module Rucker
     # We're breaking the promise of caching nothing on the justification that we
     # are executing high-level care in the orchestration level.
     #
-    class ActualContainer < Docker::Container
+    class DockerContainer < ::Docker::Container
 
       #
       # The first set of attributes come for free with ActualContainer.all
@@ -112,7 +112,7 @@ module Rucker
       # @see Rucker::Manifest::PortBinding
       # @return [Array[Hash]] hash with keys `hport`, `cport`, `proto` and
       #   `bind`, suitable for sending to Rucker::Manifest::PortBinding
-      def ports_from_ext
+      def ports_using_ext
         pbs = []
         bound_ports = ext_info['HostConfig']['PortBindings'] or return []
         bound_ports.each do |key, bindings|
@@ -166,7 +166,7 @@ module Rucker
         }
       end
 
-      def self.create_from_manifest(ctr)
+      def self.create_using_manifest(ctr)
         create(raw_create_hsh(ctr))
       end
 
@@ -186,11 +186,11 @@ module Rucker
         super({ 'all' => 'True' }.merge(opts))
       end
 
-      def start_from_manifest(ctr)
+      def start_using_manifest(ctr)
         start!(raw_start_hsh(ctr))
       end
 
-      def stop_from_manifest(ctr)
+      def stop_using_manifest(ctr)
         stop()
       end
 
@@ -255,7 +255,7 @@ module Rucker
       #   hash = Docker::Util.parse_json(connection.post('/commit',
       #       options,
       #       :body => config.to_json))
-      #   Rucker::Actual::ActualImage.send(:new, self.connection, hash)
+      #   Rucker::Actual::DockerImage.send(:new, self.connection, hash)
       # end
 
       #

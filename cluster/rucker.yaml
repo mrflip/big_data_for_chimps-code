@@ -1,16 +1,34 @@
 local:
-
+  provider:             'docker'
+  
   nodes:
     control:
       node_type:        't2.medium'
       region:           'us-west-2'
       instances:        1
       containers:
+        - hostname_bot
+        - es
+        #
+        - data_nn
+        - data_rm
+        - data_hue
+        - data_gold
+        - data_outd
+        - home_chimpy
+        #
         - nn
         - rm
         - snn
         - hue
         - lounge
+    worker:
+      node_type:        't2.medium'
+      region:           'us-west-2'
+      instances:        1
+      containers:
+        - worker00
+        - data_hdfs0
 
   images:
     # Community-accepted starting points we
@@ -42,42 +60,39 @@ local:
     data_nn:           { repo_tag: 'mrflip/data_nn:latest',     'kind': 'data' }
     data_outd:         { repo_tag: 'mrflip/data_outd:latest',   'kind': 'data' }
     home_chimpy:       { repo_tag: 'mrflip/home_chimpy:latest', 'kind': 'data' }
-    
-  # clusters
-  clusters:
+
+  services:
 
     # ===========================================================================
     #
     # Helper images
     #
-    helpers:
-      hostname_bot:
-        doc:         'Manages /etc/hosts on all containers, allowing discovery'
-        image_name:  'docker_hosts'
-        entry_args:  ['/srv/hostname_bot/hosts']
-        volumes:
-          - '/var/lib/hostname_bot:/srv/hostname_bot'
-          - '/var/run/docker.sock:/var/run/docker.sock'
-        hostname:     'hostname_bot'
+    hostname_bot:
+      doc:         'Manages /etc/hosts on all containers, allowing discovery'
+      image_name:  'docker_hosts'
+      entry_args:  ['/srv/hostname_bot/hosts']
+      volumes:
+        - '/var/lib/hostname_bot:/srv/hostname_bot'
+        - '/var/run/docker.sock:/var/run/docker.sock'
+      hostname:     'hostname_bot'
 
-      es:
-        doc:         'Elasticsearch server for Lipstick'
-        image_name:  'elasticsearch'
-        hostname:    'es'
-        ports:       [ '9200~api', '9300~transport' ]
+    es:
+      doc:         'Elasticsearch server for Lipstick'
+      image_name:  'elasticsearch'
+      hostname:    'es'
+      ports:       [ '9200~api', '9300~transport' ]
 
     # ===========================================================================
     #
     # Data
     #
 
-    data:
-      data_gold:   { volumes: ['/data/gold:/data/gold'],               entry_args: ['pushpull', '/data/gold'],        image_name: 'data_gold', _type: 'rucker.manifest.data_container'   }
-      data_outd:   { volumes: ['/data/outd:/data/outd'],               entry_args: ['pushpull', '/data/outd'],        image_name: 'data_outd', _type: 'rucker.manifest.data_container'   }
-      data_hue:    { volumes: ['/bulk/hadoop/hue:/bulk/hadoop/hue'],   entry_args: ['pushpull', '/bulk/hadoop/hue'],  image_name: 'data_hue', _type: 'rucker.manifest.data_container'    }
-      data_nn:     { volumes: ['/bulk/hadoop/name:/bulk/hadoop/name'], entry_args: ['pushpull', '/bulk/hadoop/name'], image_name: 'data_nn', _type: 'rucker.manifest.data_container'     }
-      data_hdfs0:  { volumes: ['/bulk/hadoop/hdfs:/bulk/hadoop/hdfs'], entry_args: ['pushpull', '/bulk/hadoop/hdfs'], image_name: 'data_hdfs0', _type: 'rucker.manifest.data_container'  }
-      home_chimpy: { volumes: ['/home/chimpy:/home/chimpy'],           entry_args: ['pushpull', '/home/chimpy'],      image_name: 'home_chimpy', _type: 'rucker.manifest.data_container' }
+    data_gold:   { volumes: ['/data/gold:/data/gold'],               entry_args: ['pushpull', '/data/gold'],        image_name: 'data_gold', _type: 'rucker.manifest.data_container'   }
+    data_outd:   { volumes: ['/data/outd:/data/outd'],               entry_args: ['pushpull', '/data/outd'],        image_name: 'data_outd', _type: 'rucker.manifest.data_container'   }
+    data_hue:    { volumes: ['/bulk/hadoop/hue:/bulk/hadoop/hue'],   entry_args: ['pushpull', '/bulk/hadoop/hue'],  image_name: 'data_hue', _type: 'rucker.manifest.data_container'    }
+    data_nn:     { volumes: ['/bulk/hadoop/name:/bulk/hadoop/name'], entry_args: ['pushpull', '/bulk/hadoop/name'], image_name: 'data_nn', _type: 'rucker.manifest.data_container'     }
+    data_hdfs0:  { volumes: ['/bulk/hadoop/hdfs:/bulk/hadoop/hdfs'], entry_args: ['pushpull', '/bulk/hadoop/hdfs'], image_name: 'data_hdfs0', _type: 'rucker.manifest.data_container'  }
+    home_chimpy: { volumes: ['/home/chimpy:/home/chimpy'],           entry_args: ['pushpull', '/home/chimpy'],      image_name: 'home_chimpy', _type: 'rucker.manifest.data_container' }
 
     # ===========================================================================
     #
@@ -85,126 +100,138 @@ local:
     #
     # Remember that these must be in order you want them started
     #
-    hadoop:
 
-      # lipstick:
-      #   doc:         'Lipstick server for pig jobs pretty'
-      #   image_name:  'lipstick'
-      #   hostname:    'lipstick'
-      #   ports:       [ '10001:9292~ui' ]
-      #   links:       [ 'es:es' ]
-      #   volumes_from:
-      #     - home_chimpy
+    nn:
+      image_name:   'hadoop_nn'
+      hostname:     'nn'
+      # console http 50070; ipc 8020
+      ports:         [ '9522:22~ssh', '50070:50070~view', '8020:8020~ipc' ]
+      volumes_from:
+        - data_nn
+      # links:
+      #   - 'hostname_bot:hostname_bot'
+      volumes:
+         # dynamic /etc/hosts file
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      nn:
-        image_name:   'hadoop_nn'
-        hostname:     'nn'
-        # console http 50070; ipc 8020
-        ports:         [ '9522:22~ssh', '50070:50070~view', '8020:8020~ipc' ]
-        volumes_from:
-          - data_nn
-        # links:
-        #   - 'hostname_bot:hostname_bot'
-        volumes:
-           # dynamic /etc/hosts file
-          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+    snn:
+      image_name: 'hadoop_snn'
+      hostname:     'snn'
+      # checkpoint api http 50090
+      ports:         [ '9422:22~ssh', '50090~ipc' ]
+      links:
+        - 'nn:nn'
+      volumes:
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      snn:
-        image_name: 'hadoop_snn'
-        hostname:     'snn'
-        # checkpoint api http 50090
-        ports:         [ '9422:22~ssh', '50090~ipc' ]
-        links:
-          - 'nn:nn'
-        volumes:
-          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+    rm:
+      image_name: 'hadoop_rm'
+      hostname:     'rm'
+      # rsrc mgr: console http 8088; scheduler 8030; tracker 8031; ipc 8032; admin 8033, shuffle 13562;
+      # history:  console 19888 / https 19890, ipc 10020, admin 10033
+      ports:         [ '9322:22~ssh', '8088:8088~view', '8030:8030~sched', '8031:8031~tracker', '8032:8032~ipc', '8033:8033~yarnad', '13562:13562~shuffle', '19888:19888~histview', '10020:10020~ipc', '10033:10033~histad' ]
+      links:
+        - 'nn:nn'
+      volumes:
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      rm:
-        image_name: 'hadoop_rm'
-        hostname:     'rm'
-        # rsrc mgr: console http 8088; scheduler 8030; tracker 8031; ipc 8032; admin 8033, shuffle 13562;
-        # history:  console 19888 / https 19890, ipc 10020, admin 10033
-        ports:         [ '9322:22~ssh', '8088:8088~view', '8030:8030~sched', '8031:8031~tracker', '8032:8032~ipc', '8033:8033~yarnad', '13562:13562~shuffle', '19888:19888~histview', '10020:10020~ipc', '10033:10033~histad' ]
-        links:
-          - 'nn:nn'
-        volumes:
-          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+    # jt:
+    #   image_name: 'hadoop_jt'
+    #   hostname:     'jt'
+    #   #
+    #   ports:         [ '9222:22~ssh', '50030:50030~view', '8021:8021~ipc', '9290:9290~thrift' ]
+    #   links:
+    #     - 'nn:nn'
+    #   volumes:
+    #     - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+    #     - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
 
-      # jt:
-      #   image_name: 'hadoop_jt'
-      #   hostname:     'jt'
-      #   # 
-      #   ports:         [ '9222:22~ssh', '50030:50030~view', '8021:8021~ipc', '9290:9290~thrift' ]
-      #   links:
-      #     - 'nn:nn'
-      #   volumes:
-      #     - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-      #     - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+    # Give explicit port mappings to this hero worker.
+    worker00:
+      image_name: 'hadoop_worker'
+      # node mgr:  console http 8042, localizer 8040, ipc 8041
+      # data node: console http 50075, ipc 50020, xceiver 50010
+      ports:         [ '9122:22~ssh', '8042:8042~nmview', '50075:50075~dnview', '50060:50060~tt', '8040~lclzr', '8041~nmipc', '50020~dnipc', '50010~dnxceiver' ]
+      links:
+        - 'nn:nn'
+        - 'rm:rm'
+        # - 'jt:jt'
+      volumes:
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+      volumes_from:
+        - 'data_hdfs0'
+      hostname:     'worker00'
 
-      #
-      # TODO: We have hardcoded port mappings to the first docker host, which is
-      # convenient. It also however forces us to have a one-worker-only cluster.
-      #
-      worker00:
-        image_name: 'hadoop_worker'
-        # node mgr:  console http 8042, localizer 8040, ipc 8041
-        # data node: console http 50075, ipc 50020, xceiver 50010
-        ports:         [ '9122:22~ssh', '8042:8042~nmview', '50075:50075~dnview', '50060:50060~tt', '8040~lclzr', '8041~nmipc', '50020~dnipc', '50010~dnxceiver' ]
-        links:
-          - 'nn:nn'
-          - 'rm:rm'
-          # - 'jt:jt'
-        volumes:
-          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
-        volumes_from:
-          - 'data_hdfs0'
-        hostname:     'worker00'
+    # All other workers expose their ports on auto-assigned numbers
+    grunt:
+      image_name: 'hadoop_worker'
+      # node mgr:  console http 8042, localizer 8040, ipc 8041
+      # data node: console http 50075, ipc 50020, xceiver 50010
+      ports:         [ '22~ssh', '8042~nmview', '50075~dnview', '50060~tt', '8040~lclzr', '8041~nmipc', '50020~dnipc', '50010~dnxceiver' ]
+      links:
+        - 'nn:nn'
+        - 'rm:rm'
+        # - 'jt:jt'
+      volumes:
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+      instances: 0
 
-      #
-      hue:
-        image_name: 'hadoop_hue'
-        hostname:     'hue'
-        ports:         [ '9622:22~ssh', '10000:10000~hue' ]
-        volumes:
-          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
-          - '/Users:/Users:rw'
-        volumes_from:
-          - 'data_hue'
-          - 'home_chimpy'
-        links:
-          - 'nn:nn'
-          - 'rm:rm'
-          # - 'lipstick:lipstick'
-          - 'worker00:worker00'
-          # - 'jt:jt'
+    #
+    hue:
+      image_name: 'hadoop_hue'
+      hostname:     'hue'
+      ports:         [ '9622:22~ssh', '10000:10000~hue' ]
+      volumes:
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+        - '/Users:/Users:rw'
+      volumes_from:
+        - 'data_hue'
+        - 'home_chimpy'
+      links:
+        - 'nn:nn'
+        - 'rm:rm'
+        # - 'lipstick:lipstick'
+        - 'worker00:worker00'
+        # - 'jt:jt'
 
-      #
-      # Running hue on the lounge so that there's only one URL users need to learn.
-      #
-      lounge:
-        image_name: 'hadoop_lounge'
-        hostname:     'lounge'
-        ports:         [ '9022:22~ssh' ]
-        volumes:
-          - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-          - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
-          - '/Users:/Users:rw'
-        volumes_from:
-          - 'data_gold'
-          - 'data_outd'
-          - 'home_chimpy'
-        links:
-          - 'nn:nn'
-          - 'rm:rm'
-          # - 'lipstick:lipstick'
-          - 'worker00:worker00'
-          - 'hue:hue'
-          # - 'jt:jt'
+    #
+    # Running hue on the lounge so that there's only one URL users need to learn.
+    #
+    lounge:
+      image_name: 'hadoop_lounge'
+      hostname:     'lounge'
+      ports:         [ '9022:22~ssh' ]
+      volumes:
+        - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
+        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
+        - '/Users:/Users:rw'
+      volumes_from:
+        - 'data_gold'
+        - 'data_outd'
+        - 'home_chimpy'
+      links:
+        - 'nn:nn'
+        - 'rm:rm'
+        # - 'lipstick:lipstick'
+        - 'worker00:worker00'
+        - 'hue:hue'
+        # - 'jt:jt'
+
+    # lipstick:
+    #   doc:         'Lipstick server for pig jobs pretty'
+    #   image_name:  'lipstick'
+    #   hostname:    'lipstick'
+    #   ports:       [ '10001:9292~ui' ]
+    #   links:       [ 'es:es' ]
+    #   volumes_from:
+    #     - home_chimpy
+
 
   # extra ports to open up to allow expansion
   extra_ports:
