@@ -62,3 +62,14 @@ weight_hist	  = binned_histogram(people, 'weight_lb', 10, 300);
 
 birthmo_hist = histogram(people, 'birth_month');
 deathmo_hist = histogram(people, 'death_month');
+
+vitals = FOREACH people GENERATE
+    height_in,
+    10*CEIL(weight_lb/10.0) AS weight_lb,
+    birth_month,
+    death_month;
+
+birth_month_hist = histogram(vitals, 'birth_month');
+death_month_hist = histogram(vitals, 'death_month');
+height_hist = histogram(vitals, 'height_in');
+weight_hist = histogram(vitals, 'weight_lb');
