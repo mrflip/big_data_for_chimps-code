@@ -55,3 +55,25 @@ G_hist = FOREACH (GROUP G_vals BY val) GENERATE
     COUNT_STAR(G_vals) AS ct;
 
 
+-- Macros for histograms
+DEFINE histogram(table, key) RETURNS dist {
+    vals = FOREACH $table GENERATE $key;
+    $dist = FOREACH (GROUP vals BY $key) GENERATE
+        group AS val, 
+        COUNT_STAR(vals) AS ct;
+};
+
+DEFINE binned_histogram(table, key, binsize, maxval) RETURNS dist {
+    -- A list of numbers from 0-9999
+    numbers = LOAD '/data/gold/numbers10k.txt' AS (number:int);
+    vals = FOREACH $table GENERATE (long)(FLOOR($key / $binsize) * $binsize) AS bin;
+    all_bins = FOREACH numbers GENERATE (number * $binsize) AS bin;
+    all_bins = FILTER  all_bins BY (bin <= $maxval);
+    $dist = FOREACH (COGROUP vals BY bin, all_bins BY bin) GENERATE
+        group AS bin, 
+        (COUNT_STAR(vals) == 0L ? 0L : COUNT_STAR(vals)) AS ct;
+};
+
+career_G_hist	    = binned_histogram(bat_careers, 'G', 50, 3600);
+career_G_hist_2   = binned_histogram(bat_careers, 'G', 2, 3600);
+career_G_hist_200 = binned_histogram(bat_careers, 'G', 200, 3600);

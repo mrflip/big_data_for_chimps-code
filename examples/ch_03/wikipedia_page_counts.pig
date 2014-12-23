@@ -3,7 +3,7 @@
    the third column is the number of requests, and the fourth column is the size of the content returned. */
    
 -- LOAD the data, which is space-delimited
-pageviews = LOAD '/data/rawd/wikipedia/page_counts/pagecounts-20141126-230000.log' USING PigStorage(' ') AS (
+pageviews = LOAD '/data/rawd/wikipedia/page_counts/pagecounts-20141126-230000.gz' USING PigStorage(' ') AS (
    project_name:chararray, 
    page_title:chararray, 
    requests:long, 
