@@ -77,4 +77,3 @@ bmis = FOREACH (JOIN fatness BY player_id, slugging_stats BY player_id) {
         weight_lb, 
         BMI;
 };
-
