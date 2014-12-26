@@ -29,6 +29,7 @@ bat_seasons = LOAD '/data/gold/sports/baseball/bat_seasons.tsv' USING PigStorage
     H:int,    h1B:int,  h2B:int,  h3B:int, HR:int,   R:int,    RBI:int  -- $13-$19
 );
 
+
 -- Histogram of Number of Seasons
 vals = FOREACH bat_careers GENERATE n_seasons AS bin;
 seasons_hist = FOREACH (GROUP vals BY bin) GENERATE
