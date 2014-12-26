@@ -31,10 +31,11 @@ player_stadia = FOREACH (JOIN
         player_team_years::team_id AS team_id,
         player_id,
         park_id;
+
+-- Count the number of player_stadia
 total_player_stadia = FOREACH (GROUP player_stadia ALL) GENERATE
     'player_stadium' AS label,
     COUNT_STAR(player_stadia) AS total;
 
 -- Finally, UNION our label/totals and dump them together
 answer = UNION total_bat_seasons, total_park_team_years, total_player_stadia; DUMP @;
-
