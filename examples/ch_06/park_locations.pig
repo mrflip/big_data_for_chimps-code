@@ -37,3 +37,5 @@ geonames = LOAD '/data/gold/geo/US.txt.bz2' AS (
 geonames = FILTER geonames BY feature_code == 'STDM';
 
 parks_geonames = JOIN parks BY (park_name, state, country) LEFT OUTER, geonames BY (name, admin1_code, country_code);
+
+DUMP @;
