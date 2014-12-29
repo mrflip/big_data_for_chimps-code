@@ -47,3 +47,31 @@ by_diff_older = FOREACH (ORDER by_diff_older BY diff DESC, player_id) GENERATE
     player_id..;
 
 
+-- Handling nulls when sorting
+nulls_sort_demo = FOREACH career_epochs GENERATE 
+    (OPS_older IS NULL ? 0 : 1) AS has_older_epoch, 
+    player_id..;
+nulls_then_vals = FOREACH (ORDER nulls_sort_demo BY 
+    has_older_epoch ASC,  
+    OPS_all DESC, 
+    player_id)
+    GENERATE 
+        player_id..;
+vals_then_nulls = FOREACH (ORDER nulls_sort_demo BY
+    has_older_epoch DESC, 
+    OPS_all DESC, 
+    player_id)
+    GENERATE 
+        player_id..;
+
+
+-- Floating Values to the Top of the Sort Order
+post1985_vs_earlier = FOREACH career_epochs GENERATE 
+    (beg_year >= 1985 ? 1 : 0) AS is_1985, 
+    player_id..;
+post1985_vs_earlier = FOREACH (ORDER post1985_vs_earlier BY 
+    is_1985 DESC, 
+    n_older DESC, 
+    player_id)
+    GENERATE 
+        player_id..;

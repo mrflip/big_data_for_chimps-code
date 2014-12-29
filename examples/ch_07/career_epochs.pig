@@ -49,14 +49,14 @@ career_epochs = FOREACH (GROUP age_seasons BY player_id) {
     SLG_young = 1.0f*SUM(age_seasons.TB_young) / SUM(age_seasons.AB_young);
     --
     GENERATE
-        group AS player_id,
+        group    AS player_id,
         PA_all   AS PA_all,
         PA_young AS PA_young,
         PA_prime AS PA_prime,
         PA_older AS PA_older,
         --
-        MIN(age_seasons.year_id)  AS beg_year,
-        MAX(age_seasons.year_id)  AS end_year,
+        MIN(age_seasons.year_id) AS beg_year,
+        MAX(age_seasons.year_id) AS end_year,
         --
         OBP_all   + SLG_all       AS OPS_all:float,
         (PA_young >= 700 ? OBP_young + SLG_young : Null) AS OPS_young:float,
