@@ -63,3 +63,30 @@ top_5_per_season = FOREACH (GROUP bat_seasons BY year_id) {
         group AS year_id,
         ascending AS top_5;
 };
+
+
+-- Rank records
+ranked_seasons = RANK bat_seasons; 
+ranked_rbi_seasons = RANK bat_seasons BY 
+    RBI DESC, 
+    H DESC, 
+    player_id;
+ranked_hit_dense = RANK bat_seasons BY
+    H DESC DENSE;
+
+
+-- For each season by a player, select the team they played the most games for.
+-- In SQL, this is fairly clumsy (involving a self-join and then elimination of
+-- ties) In Pig, we can ORDER BY within a foreach and then pluck the first
+-- element of the bag.
+top_stint_per_player_year = FOREACH (GROUP bat_seasons BY (player_id, year_id)) {
+    sorted = ORDER bat_seasons BY RBI DESC;
+    top_stint = LIMIT sorted 1;
+	stints = COUNT_STAR(bat_seasons);
+    GENERATE 
+        group.player_id, 
+        group.year_id, 
+		stints AS stints,
+        FLATTEN(top_stint.(team_id, RBI)) AS (team_id, RBI);
+};
+multiple_stints = FILTER top_stint_per_player_year BY stints > 1;
