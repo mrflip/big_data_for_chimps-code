@@ -75,6 +75,8 @@ ranked_hit_dense = RANK bat_seasons BY
     H DESC DENSE;
 
 
+-- Finding the Record with the Max Value:
+--
 -- For each season by a player, select the team they played the most games for.
 -- In SQL, this is fairly clumsy (involving a self-join and then elimination of
 -- ties) In Pig, we can ORDER BY within a foreach and then pluck the first
