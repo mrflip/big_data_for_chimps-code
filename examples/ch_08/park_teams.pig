@@ -16,4 +16,10 @@ dont_do_this = FOREACH (GROUP park_team_years BY (team_id, park_id)) GENERATE
     group.park_id;
 
 
--- 
+-- Eliminating Duplicate Records from a Group
+team_park_list = FOREACH (GROUP park_team_years BY team_id) {
+    parks = DISTINCT park_team_years.park_id;
+    GENERATE 
+        group AS team_id, 
+        BagToString(parks, '|');
+};
