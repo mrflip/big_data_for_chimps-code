@@ -34,7 +34,10 @@ dump @;
 
 
 -- Constructing a Sequence of Sets
-sig_seasons = FILTER bat_seasons BY ((year_id >= 1900) AND (lg_id == 'NL' OR lg_id == 'AL') AND (PA >= 450));
+sig_seasons = FILTER bat_seasons BY 
+    ((year_id >= 1900) AND 
+    (lg_id == 'NL' OR lg_id == 'AL') AND 
+    (PA >= 450));
 
 y1 = FOREACH sig_seasons GENERATE player_id, team_id, year_id;
 y2 = FOREACH sig_seasons GENERATE player_id, team_id, year_id;
