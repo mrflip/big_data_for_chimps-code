@@ -13,25 +13,22 @@ class MRJoin(MRJob):
     splits = line.rstrip("\n").split("|")
     
     if len(splits) == 2: # country data
-      symbol = 'A'
-      countryName = splits[0]
+      symbol = 'A' # make country sort before person data
       country2digit = splits[1]
-      yield country2digit, [symbol, countryName]
+      yield country2digit, [symbol, splits]
     else: # person data
       symbol = 'B'
-      personName = splits[0]
-      personType = splits[1]
       country2digit = splits[2]
-      yield country2digit, [symbol, personName, personType]
+      yield country2digit, [symbol, splits]
   
   def reducer(self, key, values):
-    values = [x for x in values]
-    if len(values) > 1: # our join hit
-      country = values[0]
-      for value in values[1:]:
-        yield key, [country, value]
-    else: # our join missed
-      pass
+    countries = [] # should come first, as they are sorted on artificia key 'A'
+    for value in values:
+      if value[0] == 'A':
+        countries.append(value)
+      if value[0] == 'B':
+        for country in countries:
+          yield key, country[1:] + value[1:]
       
 if __name__ == '__main__':
   MRJoin.run()
