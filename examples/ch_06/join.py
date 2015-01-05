@@ -6,7 +6,7 @@ from mrjob.job import MRJob
 
 class MRJoin(MRJob):
   
-  # Performs secondary search
+  # Performs secondary sort
   SORT_VALUES = True
   
   def mapper(self, _, line):    
