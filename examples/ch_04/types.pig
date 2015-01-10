@@ -14,7 +14,11 @@ people = LOAD '/data/gold/sports/baseball/people.tsv' USING PigStorage('\t') AS 
 -- Converting types
 birthplaces = FOREACH people GENERATE
     player_id,
-    StringConcat((chararray)birth_year, '-', (chararray)birth_month, '-', (chararray)birth_day) AS birth_date
+    StringConcat(
+        (chararray)birth_year, '-', 
+        (chararray)birth_month, '-', 
+        (chararray)birth_day
+    ) AS birth_date
 ;
 
 bat_seasons = LOAD '/data/gold/sports/baseball/bat_seasons.tsv' USING PigStorage('\t') AS (

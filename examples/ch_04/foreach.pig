@@ -54,13 +54,20 @@ DEFINE Coalesce datafu.pig.util.Coalesce();
 DEFINE SPRINTF datafu.pig.util.SPRINTF();
 
 -- Assembling complex types (Only for Pig >= 0.14.0)
-people = FILTER people BY (beg_date IS NOT NULL) AND (end_date IS NOT NULL) AND (birth_year IS NOT NULL) AND (death_year IS NOT NULL);
+people = FILTER people BY (beg_date IS NOT NULL) AND 
+                          (end_date IS NOT NULL) AND 
+                          (birth_year IS NOT NULL) AND 
+                          (death_year IS NOT NULL);
 
 date_converted = FOREACH people {
     beg_dt   = ToDate(CONCAT(beg_date, 'T00:00:00.000Z'));
     end_dt   = ToDate(end_date, 'yyyy-MM-dd', '+0000');
-    birth_dt = ToDate(SPRINTF('%s-%s-%sT00:00:00Z', birth_year, Coalesce(birth_month,1), Coalesce(birth_day,1)));
-    death_dt = ToDate(SPRINTF('%s-%s-%sT00:00:00Z', death_year, Coalesce(death_month,1), Coalesce(death_day,1)));
+    birth_dt = ToDate(
+        SPRINTF('%s-%s-%sT00:00:00Z', birth_year, Coalesce(birth_month,1), Coalesce(birth_day,1))
+    );
+    death_dt = ToDate(
+        SPRINTF('%s-%s-%sT00:00:00Z', death_year, Coalesce(death_month,1), Coalesce(death_day,1))
+    );
 
     GENERATE player_id, birth_dt, death_dt, beg_dt, end_dt, name_first, name_last;
 };
@@ -77,8 +84,16 @@ graphable = FOREACH people {
     occasions = {
         ('birth', birth_year, birth_month, birth_day),
         ('death', death_year, death_month, death_day),
-        ('debut', (int)SUBSTRING(beg_date,0,4), (int)SUBSTRING(beg_date,5,7), (int)SUBSTRING(beg_date,8,10)),
-        ('lastg', (int)SUBSTRING(end_date,0,4), (int)SUBSTRING(end_date,5,7), (int)SUBSTRING(end_date,8,10))
+        ('debut', 
+            (int)SUBSTRING(beg_date,0,4), 
+            (int)SUBSTRING(beg_date,5,7), 
+            (int)SUBSTRING(beg_date,8,10)
+        ),
+        ('lastg', 
+            (int)SUBSTRING(end_date,0,4), 
+            (int)SUBSTRING(end_date,5,7), 
+            (int)SUBSTRING(end_date,8,10)
+        )
     };
     --
     places = (

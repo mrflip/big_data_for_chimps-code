@@ -1,5 +1,7 @@
-park_team_years = LOAD '/data/gold/sports/baseball/park_team_years.tsv' USING PigStorage('\t') AS (
-    park_id:chararray, team_id:chararray, year:long, beg_date:chararray, end_date:chararray, n_games:long
+park_team_years = LOAD '/data/gold/sports/baseball/park_team_years.tsv' 
+    USING PigStorage('\t') AS (
+        park_id:chararray, team_id:chararray, year:long, 
+        beg_date:chararray, end_date:chararray, n_games:long
 );
 team_park_seasons = FOREACH (GROUP park_team_years BY team_id) GENERATE 
 	group AS team_id, 
