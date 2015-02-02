@@ -16,9 +16,11 @@ EXPOSE 19888
 EXPOSE 10020
 EXPOSE 1033
 
+COPY img/hadoop_rm/hadoop-setup_rm.sh \
+     /build/
+
 # Install and configure the resourcemanager and historyserver
 #
-COPY img/hadoop_rm/hadoop-setup_rm.sh /build/
 RUN         /build/hadoop-setup_rm.sh
 
 # Ensures Hadoop directories are happy and permissioned even if we mount something under them.

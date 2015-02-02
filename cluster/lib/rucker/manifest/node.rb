@@ -8,92 +8,98 @@ module Rucker
       field :node_type, :string
       field :region,    :string
       field :instances, :integer
-      field :container_names, :string
+      field :container_names, :array, of: :symbol
+      #
       accessor_field :containers, Rucker::Manifest::ContainerCollection
       accessor_field :actual,     ::Tutum::NodeCluster, reader: :public, writer: :public
       accessor_field :node,       ::Tutum::Node,        reader: :public, writer: :public
 
-      def create!()
-        self.actual = Rucker.node_provider.create_using_manifest(self)
-        forget
-      end
+      # ===========================================================================
+      #
+      # Delegated Properties
+      #
 
-      def start!()
-        actual.start_using_manifest(self)
-        forget
-      end
-
-      def stop!()
-        actual.stop_using_manifest(self)
-        forget
-      end
-
-      def remove!()
-        actual.remove_using_manifest(self)
-        forget
-      end
+      # ===========================================================================
+      #
+      # States
+      #
 
       def state()
-        return :absent if self.actual.nil?
-        actual.state
+        actual_or(:state, :absent)
       end
 
-      #
-      # Orchestration movements
-      #
-
-      def actual_or(meth, val)
-        actual.nil? ? val : actual.public_send(meth)
-      end
+      def transition?() actual_or(:transition?, false) ; end
+      def absent?()     actual_or(:absent?, true)      ; end
+      def exists?()     not absent?                    ; end
 
       def up?()         actual_or(:up?,     false)     ; end
       def ready?()      actual_or(:ready?,  false)     ; end
       def down?()       actual_or(:down?,   true)      ; end
-      def absent?()     actual_or(:absent?, true)      ; end
       def clear?()      actual_or(:clear?,  true)      ; end
-      def transition?() actual_or(:transition?, false) ; end
+
+      # ===========================================================================
+      #
+      # Goals
+      #
 
       before :up do
         [ [self, :ready] ]
       end
 
       goal :up do
-        case
-        when transition? then           return :wait
-        when ready?      then start! ;  return :start!
-        else
-          return RuntimeError.new("Should not advance to :up from state #{state} -- #{self}")
-        end
+        start!
+        return :start!
       end
 
       goal :ready do
-        case
-        when transition? then           return :wait
-        when absent?     then create! ; return :create!
-        else
-          return RuntimeError.new("Should not advance to :ready from state #{state} -- #{self}")
-        end
+        create!
+        return :create!
       end
 
-      # Take the next step towards the down goal
       goal :down do
-        case
-        when transition? then           return :wait
-        when up?         then stop! ;   return :stop!
-        else
-          return RuntimeError.new("Should not advance to :clear from state #{state} -- #{self}")
-        end
+        stop!
+        return :stop!
       end
 
-      # Take the next step towards the clear goal
+      before :clear do
+        [ [self, :down] ]
+      end
+
       goal :clear do
-        case
-        when transition? then           return :wait
-        else
-          return :remove!
-        end
+        remove!
+        return :remove!
       end
 
+      # ===========================================================================
+      #
+      # Actions
+      #
+
+      def create!()
+        Rucker.progress(:creating, self)
+        self.actual = Rucker.node_provider.create_using_manifest(self)
+        forget
+      end
+
+      def start!()
+        Rucker.progress(:starting, self)
+        actual.start_using_manifest(self)
+        forget
+      end
+
+      def stop!()
+        Rucker.progress(:stopping, self)
+        actual.stop_using_manifest(self)
+        forget
+      end
+
+      def remove!()
+        Rucker.progress(:removing, self)
+        actual.remove_using_manifest(self)
+        forget
+      end
+
+      # ===========================================================================
       #
       # Mechanics
       #
@@ -109,7 +115,7 @@ module Rucker
 
       def receive_containers(arr)
         if arr.all?{|val| val.is_a?(String) }
-          self.container_names = arr
+          self.receive_container_names(arr)
         else
           super
         end
@@ -117,7 +123,13 @@ module Rucker
 
     end
 
+    #
+    #
+    #
     class NodeCollection < Rucker::KeyedCollection
+      include Rucker::Manifest::HasState
+      include Rucker::CollectsGoals
+      #
       self.item_type = Rucker::Manifest::Node
 
       def refresh!
@@ -126,16 +138,6 @@ module Rucker
         Rucker.node_provider.actualize_manifests(self)
         self
       end
-
-      def up(*args)    Rucker::Manifest::Node.reach(self.items, :up)    ; end
-      def ready(*args) Rucker::Manifest::Node.reach(self.items, :ready) ; end
-      def down(*args)  Rucker::Manifest::Node.reach(self.items, :down)  ; end
-      def clear(*args) Rucker::Manifest::Node.reach(self.items, :clear) ; end
-
-      def up?()    items.all?(&:up?)    ; end
-      def ready?() items.all?(&:ready?) ; end
-      def down?()  items.all?(&:down?)  ; end
-      def clear?() items.all?(&:clear?) ; end
 
     end
 

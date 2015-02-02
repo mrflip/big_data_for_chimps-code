@@ -52,6 +52,7 @@ module Rucker
           return :success if at_goal?(target)
           remaining = check_preconditions(target)
           return remaining if remaining.present?
+          return :wait    if transition?
           self.send("_advance_#{target}")
         end
       end
@@ -63,11 +64,12 @@ module Rucker
         next_goalset = Set.new
         #
         goalset.each do |obj, goal|
+          Rucker.progress(goal, obj, {phase: 'prior', indent: 2, state: [obj.state, ';'] })
           result      = obj.public_send(goal)
           result_info = { was: result }
           #
           case result
-          when :success  then succs << obj.name; result_info = { success: 'yay' }
+          when :success  then succs << obj.name; result_info = { success: goal }
           when Exception then fails << result;   result_info = { error:   result }
           when :wait     then waits << obj.name; result_info = { wait:    'patiently' }
           when /^(.*)!$/ then waits << obj.name; result_info = { ran:     $1 }
@@ -101,4 +103,36 @@ module Rucker
     end
 
   end
+
+  module CollectsGoals
+    def up(*args)
+      refresh!
+      item_type.reach(self.items, :up)
+    end
+
+    def ready(*args)
+      refresh!
+      item_type.reach(self.items, :ready)
+    end
+
+    def down(*args)
+      refresh!
+      item_type.reach(self.items.reverse, :down)
+    end
+
+    def clear(*args)
+      refresh!
+      item_type.reach(self.items.reverse, :clear)
+    end
+
+    def up?()    items.all?(&:up?)    ; end
+    def ready?() items.all?(&:ready?) ; end
+    def down?()  items.all?(&:down?)  ; end
+    def clear?() items.all?(&:clear?) ; end
+
+    def state
+      map(&:state).uniq.compact
+    end
+  end
+
 end

@@ -45,6 +45,30 @@ module Rucker
         { repo_tags: repo_tags, size: size, id: id, created_at: created_at }
       end
 
+      # ===========================================================================
+      #
+      # State
+      #
+
+      def state()
+        :created
+      end
+
+      def created?()    state == :created ; end
+      def transition?() false             ; end
+      def absent?()     false             ; end
+      def exists?()     not absent?       ; end
+
+      def up?()         exists?           ; end
+      def ready?()      exists?           ; end
+      def down?()       true              ; end
+      def clear?()      absent?           ; end
+
+      # ===========================================================================
+      #
+      # Actions
+      #
+
       def self.pull_by_name(registry, image_name, tag, docker_creds, &callback)
         create({'registry' => registry, 'fromImage' => image_name, 'tag' => tag},
           docker_creds, &callback)
@@ -54,6 +78,45 @@ module Rucker
       def untag(repo_tag, opts = {})
         connection.delete("/images/#{repo_tag}", opts)
       end
+
+      PROGRESS_BAR_RE = %r{\[([^\]])\] ([\d\.]+) (\w\w)/([\d\.]+) (\w\w) (\w+)}
+      PROGRESS_MUTING = 0.1
+
+      def interpret_chunk(step, actual)
+        case step['status']
+        when /^(Pushing|Pulling) repository ([^\s]+)(?: \((\d+) tags\))?/
+          Rucker.progress(($1.downcase.to_sym), self, from: $2)
+        when /^Pulling image \((.*)\) from (.*)/
+          Rucker.progress(:downloading, self, layer: step['id'], from: $2)
+        when /Sending image list/
+          Rucker.progress(:preparing, self, as: 'list of layers')
+        when /^(Pushing|Downloading)\z/
+          if step['progress']
+            Rucker.progress(:bored_now, self, progress: step['progress'], mute: PROGRESS_MUTING)
+          end
+        when /^Buffering|The push refers to a repository|Pulling metadata|Pulling fs layer|Pulling dependent layers/
+          # pass
+        when /^Extracting|The image you are pulling has been verified/
+          # pass
+        when /^Image (?:([^ ]+) )?already pushed, skipping/
+          Rucker.progress(:sending, self, layer: step['id'] || $1 || step.to_s,
+            skipped: 'layer already pushed', mute: 0.1)
+        when /^Already exists/
+          Rucker.progress(:downloaded, self, layer: step['id'] || step.to_s,
+            skipped: 'layer already exists', mute: 1.0)
+        when /^Image successfully pushed/
+          Rucker.progress(:sent,    self, layer: step['id'])
+        when /^(Download|Pull) complete/
+          Rucker.progress(("#{$1}ed".downcase.to_sym), self, layer: step['id'])
+        when /^Pushing tag for rev \[([^\]]+)\] on \{([^\}]+)/
+          Rucker.progress(:tagged,  self, layer: $1, as: $2)
+        when /^Status: (Downloaded newer image|Image is up to date) for (.+)/
+          Rucker.progress(:pulled,  self)
+        else
+          Rucker.progress(:unknown, self, step: step.inspect)
+        end
+      end
+
 
     end
   end

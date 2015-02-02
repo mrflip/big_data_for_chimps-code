@@ -20,9 +20,10 @@ module Rucker
 
       def running?() Array.wrap(state) == [:running] ; end
       def paused?()  Array.wrap(state) == [:paused ] ; end
-      def stopped?() Array.wrap(state) == [:stopped] ; end
       def restart?() Array.wrap(state) == [:restart] ; end
+      def stopped?() Array.wrap(state) == [:stopped] ; end
       def absent?()  Array.wrap(state) == [:absent ] ; end
+      def exists?() not absent?       ; end
 
       def consistent?() Array.wrap(state).flatten.uniq.length == 1 ; end
     end
@@ -36,6 +37,9 @@ module Rucker
         Rucker.warn "Extra attributes: #{attrs.keys}" if attrs.present?
       end
 
+      def actual_or(meth, val=nil)
+        actual.nil? ? val : actual.public_send(meth)
+      end
 
       def self.type_name
         Gorillib::Inflector.demodulize(name.to_s)

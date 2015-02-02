@@ -21,14 +21,17 @@ module Rucker
         world_layout = layout[name.to_s]
         world_layout['name'] = name
         world_layout['layout_file'] = layout_file
-        receive(world_layout)
+        world = receive(world_layout)
+        world.containers.each do |ctr|
+          ctr.image = world.images[ctr.image_name] or Rucker.warn "No image '#{ctr.image_name}' defined for container #{ctr}. Check #{layout_file}"
+        end
+        world
       end
 
       def refresh!
         nodes.refresh!
         images.refresh!
         containers.refresh!
-        containers.each{|ctr| ctr.image = images[ctr.image_name] or Rucker.warn "No image '#{ctr.image_name}' defined for container #{ctr}. Check #{layout_file}"}
         self
       end
 
@@ -72,8 +75,11 @@ module Rucker
       # @return [Rucker::Manifest::Container] the named container, or nil
       def container(name)  containers[name] ; end
 
-      # @return [Rucker::Manifest::Image] the named  image, or nil
+      # @return [Rucker::Manifest::Image] the named image, or nil
       def image(name)      images[name] ; end
+
+      # @return [Rucker::Manifest::Node] the named node, or nil
+      def node(name)       nodes[name]  ; end
 
       def ports
         ports_coll = Rucker::Manifest::PortBindingCollection.new(belongs_to: self)

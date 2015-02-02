@@ -2,12 +2,17 @@ FROM phusion/baseimage:0.9.15
 
 MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 
-WORKDIR /root
-ENV HOME /root
-
 ENV safe_apt_install apt-get install -y --no-install-recommends
+ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
+ENV PATH      $PATH:$JAVA_HOME/bin
 
 EXPOSE 22
+
+COPY /img/baseimage/setup-add_apt_repos.sh       \
+     /img/baseimage/setup-java.sh                \
+     /img/baseimage/setup-add_conveniences.sh    \
+     /img/baseimage/setup-other_configuration.sh \
+     /build/
 
 # Using the `code/` directory in the big_data_for_chimps git repo as working directory:
 #
@@ -25,28 +30,20 @@ EXPOSE 22
 RUN                                                               \
   apt-get update &&                                               \
   route -n | awk '/^0.0.0.0/ {print $2}' > /etc/docker_host_ip && \
-  echo "************ Docker Host: " && cat /etc/docker_host_ip
+  echo "************ Docker Host IP: " && cat /etc/docker_host_ip
 
 #
 # NOTE: INSECURE THING IS INSECURE
 #
 RUN /usr/sbin/enable_insecure_key && /etc/my_init.d/00_regen_ssh_host_keys.sh
 
-# # # Use the deb-proxy cache started in helper
-# COPY /img/baseimage/setup-deb_proxy.sh     /build/
-# RUN          /build/setup-deb_proxy.sh
-
 # Add the apt repos and a few preliminary tools we will use (40 MB)
 #
-COPY /img/baseimage/setup-add_apt_repos.sh /build/
 RUN          /build/setup-add_apt_repos.sh
 
 # Install and configure Java -- 308 MB (!)
 #
-COPY /img/baseimage/setup-java.sh          /build/
 RUN          /build/setup-java.sh
-ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
-ENV PATH      $PATH:$JAVA_HOME/bin
 
 # Install some developer conveniences
 #
@@ -58,7 +55,6 @@ ENV PATH      $PATH:$JAVA_HOME/bin
 # * node        -- 8 MB
 # * ruby        -- 27 MB
 #
-COPY /img/baseimage/setup-add_conveniences.sh /build/
 RUN          /build/setup-add_conveniences.sh
 
 # Finish configuration
@@ -66,7 +62,4 @@ RUN          /build/setup-add_conveniences.sh
 # * Install templating tool
 # * Enable SSH service
 #
-COPY /img/baseimage/setup-other_configuration.sh /build/
 RUN          /build/setup-other_configuration.sh
-
-CMD ["/sbin/my_init"]

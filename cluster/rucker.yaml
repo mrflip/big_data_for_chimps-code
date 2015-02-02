@@ -7,11 +7,10 @@ local:
       region:           'us-west-2'
       instances:        1
       containers:
-        - hostname_bot
+        # - hostname_bot
         - es
         #
         - data_nn
-        - data_rm
         - data_hue
         - data_gold
         - data_outd
@@ -22,7 +21,8 @@ local:
         - snn
         - hue
         - lounge
-    worker:
+
+    hero:
       node_type:        't2.medium'
       region:           'us-west-2'
       instances:        1
@@ -30,12 +30,19 @@ local:
         - worker00
         - data_hdfs0
 
+    grunts:
+      node_type:        't2.medium'
+      region:           'us-west-2'
+      instances:        0
+      containers:
+        - grunt
+
   images:
     # Community-accepted starting points we
-    debian:            { repo_tag: 'library/debian:stable',              external: true, est_size: '154.7 MB' }
-    debian_stable:     { repo_tag: 'library/debian:stable',              external: true, est_size: '154.7 MB' }
-    debian_latest:     { repo_tag: 'library/debian:latest',              external: true, est_size: '154.7 MB' }
-    debian_jessie:     { repo_tag: 'library/debian:jessie',              external: true, est_size: '154.7 MB' }
+    # debian:            { repo_tag: 'library/debian:stable',              external: true, est_size: '154.7 MB' }
+    # debian_stable:     { repo_tag: 'library/debian:stable',              external: true, est_size: '154.7 MB' }
+    # debian_latest:     { repo_tag: 'library/debian:latest',              external: true, est_size: '154.7 MB' }
+    # debian_jessie:     { repo_tag: 'library/debian:jessie',              external: true, est_size: '154.7 MB' }
     java_7:            { repo_tag: 'library/java:7-jdk',                 external: true, est_size: '449.8 MB' }
     busyboxplus:       { repo_tag: 'radial/busyboxplus:latest',          external: true, est_size: '' }
     docker_hosts:      { repo_tag: 'blalor/docker-hosts:latest',         external: true, est_size: '' }
@@ -63,36 +70,38 @@ local:
 
   services:
 
-    # ===========================================================================
-    #
-    # Helper images
-    #
-    hostname_bot:
-      doc:         'Manages /etc/hosts on all containers, allowing discovery'
-      image_name:  'docker_hosts'
-      entry_args:  ['/srv/hostname_bot/hosts']
-      volumes:
-        - '/var/lib/hostname_bot:/srv/hostname_bot'
-        - '/var/run/docker.sock:/var/run/docker.sock'
-      hostname:     'hostname_bot'
+    # # ===========================================================================
+    # #
+    # # Helper images
+    # #
+    # hostname_bot:
+    #   doc:         'Manages /etc/hosts on all containers, allowing discovery'
+    #   image_name:  'docker_hosts'
+    #   entry_args:  ['/srv/hostname_bot/hosts']
+    #   volumes:
+    #     - '/var/lib/hostname_bot:/srv/hostname_bot'
+    #     - '/var/run/docker.sock:/var/run/docker.sock'
+    #   hostname:     'hostname_bot'
+    #   tags:         ['helper']
 
     es:
       doc:         'Elasticsearch server for Lipstick'
       image_name:  'elasticsearch'
       hostname:    'es'
       ports:       [ '9200~api', '9300~transport' ]
+      tags:         ['helper']
 
     # ===========================================================================
     #
     # Data
     #
 
-    data_gold:   { volumes: ['/data/gold:/data/gold'],               entry_args: ['pushpull', '/data/gold'],        image_name: 'data_gold', _type: 'rucker.manifest.data_container'   }
-    data_outd:   { volumes: ['/data/outd:/data/outd'],               entry_args: ['pushpull', '/data/outd'],        image_name: 'data_outd', _type: 'rucker.manifest.data_container'   }
-    data_hue:    { volumes: ['/bulk/hadoop/hue:/bulk/hadoop/hue'],   entry_args: ['pushpull', '/bulk/hadoop/hue'],  image_name: 'data_hue', _type: 'rucker.manifest.data_container'    }
-    data_nn:     { volumes: ['/bulk/hadoop/name:/bulk/hadoop/name'], entry_args: ['pushpull', '/bulk/hadoop/name'], image_name: 'data_nn', _type: 'rucker.manifest.data_container'     }
-    data_hdfs0:  { volumes: ['/bulk/hadoop/hdfs:/bulk/hadoop/hdfs'], entry_args: ['pushpull', '/bulk/hadoop/hdfs'], image_name: 'data_hdfs0', _type: 'rucker.manifest.data_container'  }
-    home_chimpy: { volumes: ['/home/chimpy:/home/chimpy'],           entry_args: ['pushpull', '/home/chimpy'],      image_name: 'home_chimpy', _type: 'rucker.manifest.data_container' }
+    data_hue:    { volumes: ['/bulk/hadoop/hue'],  tags: ['hue'],    entry_args: ['pushpull', '/bulk/hadoop/hue'],  image_name: 'data_hue', _type: 'rucker.manifest.data_container'    }
+    data_hdfs0:  { volumes: ['/bulk/hadoop/hdfs'], tags: ['worker'], entry_args: ['pushpull', '/bulk/hadoop/hdfs'], image_name: 'data_hdfs0', _type: 'rucker.manifest.data_container'  }
+    data_gold:   { volumes: ['/data/gold'],        tags: ['lounge'], entry_args: ['pushpull', '/data/gold'],        image_name: 'data_gold', _type: 'rucker.manifest.data_container'   }
+    data_outd:   { volumes: ['/data/outd'],        tags: ['lounge'], entry_args: ['pushpull', '/data/outd'],        image_name: 'data_outd', _type: 'rucker.manifest.data_container'   }
+    data_nn:     { volumes: ['/bulk/hadoop/name'], tags: ['lounge'], entry_args: ['pushpull', '/bulk/hadoop/name'], image_name: 'data_nn', _type: 'rucker.manifest.data_container'     }
+    home_chimpy: { volumes: ['/home/chimpy'],      tags: ['lounge'], entry_args: ['pushpull', '/home/chimpy'],      image_name: 'home_chimpy', _type: 'rucker.manifest.data_container' }
 
     # ===========================================================================
     #
@@ -178,14 +187,12 @@ local:
         # - 'jt:jt'
       volumes:
         - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
-        - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
-      instances: 0
 
     #
     hue:
       image_name: 'hadoop_hue'
       hostname:     'hue'
-      ports:         [ '9622:22~ssh', '10000:10000~hue' ]
+      ports:         [ '10002:10002~hue', '9622:22~ssh' ]
       volumes:
         - '/var/lib/hostname_bot/hosts:/etc/hosts:ro'
         - '/bulk/hadoop/log:/bulk/hadoop/log:rw'
@@ -197,7 +204,6 @@ local:
         - 'nn:nn'
         - 'rm:rm'
         # - 'lipstick:lipstick'
-        - 'worker00:worker00'
         # - 'jt:jt'
 
     #
@@ -218,9 +224,8 @@ local:
       links:
         - 'nn:nn'
         - 'rm:rm'
-        # - 'lipstick:lipstick'
-        - 'worker00:worker00'
         - 'hue:hue'
+        # - 'lipstick:lipstick'
         # - 'jt:jt'
 
     # lipstick:

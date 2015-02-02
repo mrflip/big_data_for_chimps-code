@@ -28,7 +28,6 @@ require_relative 'rucker/keyed_collection'
 require_relative 'rucker/actual/docker_container'
 require_relative 'rucker/actual/docker_image'
 require_relative 'rucker/actual/tutum_node'
-require_relative 'rucker/actual/boot2d_node'
 require_relative 'rucker/actual/local_node'
 #
 require_relative 'rucker/state'
@@ -66,7 +65,8 @@ module Rucker
     %w[ utils
          manifest/base manifest/world manifest/cluster
          manifest/image manifest/container manifest/node
-         actual/actual_image    actual/actual_container
+         actual/docker_image    actual/docker_container
+         actual/tutum_node      actual/local_node
          tutum tutum/tutum_base tutum/tutum_provider tutum/tutum_service tutum/tutum_container
          utils/formatter ].each do |fn|
       load File.join(lib_dir, "rucker/#{fn}.rb")
@@ -81,15 +81,14 @@ module Rucker
   end
 
   def self.node_provider
-    # Rucker::Actual::TutumNode
-    # Rucker::Actual::Boot2dNode
-    Rucker::Actual::LocalNode
+    Rucker::Actual::TutumNode
+    # Rucker::Actual::LocalNode
   end
 
   def self.tutum
     @tutum ||=
       begin
-        creds = ::Rucker::Manifest::World.authenticate!('tutum.co')
+        creds = ::Rucker::Manifest::World.send(:credentials)['tutum.co']
         ::Tutum.authenticate!(creds['username'], creds['api_key'])
       end
   end

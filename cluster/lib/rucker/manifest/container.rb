@@ -25,18 +25,21 @@ module Rucker
       #
       class_attribute :max_retries; self.max_retries = 10
 
+      # ===========================================================================
+      #
+      # Delegated Properties
+      #
+
       def id
         actual.try(:id)
       end
 
-      def state
-        return :absent if self.actual.blank?
-        actual.state
+      def dashed_name
+        name.to_s.gsub(/_/, '-').to_sym
       end
 
       def exit_code
-        return -999 if self.actual.blank?
-        actual.exit_code
+        actual_or(:exit_code, -999)
       end
 
       def image_id()        image.try(:short_id)     ; end
@@ -70,8 +73,33 @@ module Rucker
           volumes_from.map{|nm| [nm, Rucker.world.container(nm)] }]
       end
 
+      # ===========================================================================
       #
-      # Orchestration movements
+      # States
+      #
+
+      def state
+        actual_or(:state, :absent)
+      end
+
+      def running?()    state == :running              ; end
+      def paused?()     state == :paused               ; end
+      def stopped?()    state == :stopped              ; end
+      def init?()       state == :init                 ; end
+      def partly?()     state == :partly               ; end
+
+      def transition?() actual_or(:transition?, false) ; end
+      def absent?()     actual_or(:absent?,     true)  ; end
+      def exists?()     not absent?                    ; end
+
+      def up?()         actual_or(:up?,     false)     ; end
+      def ready?()      actual_or(:ready?,  false)     ; end
+      def down?()       actual_or(:down?,   true)      ; end
+      def clear?()      actual_or(:clear?,  true)      ; end
+
+      # ===========================================================================
+      #
+      # Goals
       #
 
       before :up do
@@ -82,15 +110,12 @@ module Rucker
       end
 
       goal :up do
-        case state
-        when :paused       then unpause! ; return :unpause!
-        when :stopped      then start!   ; return :start!
-        when :init         then start!   ; return :start!
-        when :starting, :restart, :scaling, :redeploying, :stopping, :partly
-          return :wait
-        else
-          # :not_running, :absent fall to here
-          return RuntimeError.new("Should not see state #{state} for #{self}")
+        case
+        when paused?     then unpause! ; return :unpause!
+        when stopped?    then start!   ; return :start!
+        when init?       then start!   ; return :start!
+        when partly?     then start!   ; return :start!
+        else return RuntimeError.new("Should not see state #{state} for #{self}")
         end
       end
 
@@ -101,29 +126,22 @@ module Rucker
       end
 
       goal :ready do
-        case state
-        when :absent       then create!  ; return :create!
-        when :starting, :restart, :scaling, :redeploying, :stopping, :partly
-          return :wait
+        case
+        when absent?     then create!  ; return :create!
         when :not_running
           warn "Not running state -- must remove and then ready"
-          remove!
-          return :acted
-        else
-          return RuntimeError.new("Should not see state #{state} for #{self}")
+          remove! ; return :remove!
+        else return RuntimeError.new("Should not see state #{state} for #{self}")
         end
       end
 
       # Take the next step towards the down goal
       goal :down do
-        case state
-        when :running      then stop!   ;  return :stop!
-        when :paused       then stop!   ;  return :stop!
-        when :partly       then stop!   ;  return :stop!
-        when :starting, :restart, :scaling, :redeploying, :stopping
-          return :wait
-        else
-          return RuntimeError.new("Should not see state #{state} for #{self}")
+        case
+        when running?    then stop!   ;  return :stop!
+        when paused?     then stop!   ;  return :stop!
+        when partly?     then stop!   ;  return :stop!
+        else return RuntimeError.new("Should not see state #{state} for #{self}")
         end
       end
 
@@ -131,35 +149,14 @@ module Rucker
         [ [self, :down] ]
       end
 
-      # Take the next step towards the clear goal
       goal :clear do
-        case state
-        when :not_running  then remove!      ; return :remove!
-        when :stopped      then remove!      ; return :remove!
-        when :init         then remove!      ; return :remove!
-        when :starting, :restart, :scaling, :redeploying, :stopping
-          return :wait
-        else
-          # includes :running, :paused, :partly
-          return RuntimeError.new("Should not see state #{state} for #{self}")
-        end
+        remove!
+        return :remove!
       end
 
-      READY_STATES = [
-        :running, :paused, :stopped, :init, :starting,
-        :restart, :scaling, :redeploying, :stopping
-      ].to_set
-      DOWN_STATES  = [
-        :stopped, :init, :not_running, :absent
-      ]
-
-      def up?()     running?                        ; end
-      def ready?()  READY_STATES.include?(state)    ; end
-      def down?()   DOWN_STATES.include?(state)     ; end
-      def clear?()  absent?                         ; end
-
+      # ===========================================================================
       #
-      # Procedural actions
+      # Actions
       #
 
       protected
@@ -189,7 +186,7 @@ module Rucker
       # Remove a container completely.
       def remove!
         Rucker.progress(:removing, self)
-        actual.remove_using_manifest('v' => 'true')
+        actual.remove_using_manifest(self)
         forget()
       end
 
@@ -228,6 +225,12 @@ module Rucker
         Rucker.output( actual.logs(opts) )
       end
 
+
+      # ===========================================================================
+      #
+      # Mechanics
+      #
+
       def forget
         actual.forget if actual.present?
       end
@@ -237,19 +240,22 @@ module Rucker
       end
     end
 
+    #
+    # Data containers don't need to be running.
+    #
     class DataContainer < Rucker::Manifest::Container
       def up?
         # If it was started once, that's enough.
-        ((started_at) && (exit_code == 0)) || super
-      end
-      def _up
-        return true if up?
-        super
+        ((stopped_at) && (exit_code == 0)) || super
       end
     end
 
+    #
+    # Collection of containers
+    #
     class ContainerCollection < Rucker::KeyedCollection
       include Rucker::Manifest::HasState
+      include Rucker::CollectsGoals
       #
       self.item_type = Rucker::Manifest::Container
       class_attribute :max_retries; self.max_retries = 12
@@ -259,20 +265,6 @@ module Rucker
         str << ' in ' << belongs_to.desc if belongs_to.respond_to?(:desc)
         str
       end
-
-      def state
-        map(&:state).uniq.compact
-      end
-
-      def up(*args)    Rucker::Manifest::Container.reach(self.items, :up)    ; end
-      def ready(*args) Rucker::Manifest::Container.reach(self.items, :ready) ; end
-      def down(*args)  Rucker::Manifest::Container.reach(self.items, :down)  ; end
-      def clear(*args) Rucker::Manifest::Container.reach(self.items, :clear) ; end
-
-      def up?()    items.all?(&:up?)    ; end
-      def ready?() items.all?(&:ready?) ; end
-      def down?()  items.all?(&:down?)  ; end
-      def clear?() items.all?(&:clear?) ; end
 
       def logs()
         each do |ctr|
@@ -289,6 +281,7 @@ module Rucker
         #
         ctr_names = keys.to_set
         Rucker.provider.all().map do |actual|
+          Rucker.progress(:matching, actual.to_s, names: ctr_names.to_a.inspect)
           next unless actual.exists?
           # p [actual, actual.names, ctr_names ]
           # if any name matches a manifest, gift it; skip the actual otherwised

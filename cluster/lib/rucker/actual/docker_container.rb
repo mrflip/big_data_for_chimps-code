@@ -7,29 +7,30 @@ module Rucker
     #
     class DockerContainer < ::Docker::Container
 
+      # ===========================================================================
       #
-      # The first set of attributes come for free with ActualContainer.all
+      # Basic Properties
       #
+
+      # info attributes come for free with ActualContainer.all
 
       # Alternate names for this container, without initial slashes
       # @return Array[String]
-      def names()           @info['Names']   ; end
+      def names()          @info['Names']   ; end
 
       # Name for the image used to create this container
-      def image_repo_tag()      @info['Image']   ; end
+      def image_repo_tag() @info['Image']   ; end
 
       # Command that the container runs
-      def command_str()     @info['Command'] ; end
+      def command_str()    @info['Command'] ; end
 
       # Time the object was created
       def created_at()
-        Time.at( @info['Created'] ).utc.iso8601 rescue nil
+        Time.at(@info['Created']).utc.iso8601 rescue nil
       end
 
       # A readable description of the object's state
-      def status_str()      @info['Status']  ; end
-      # "SizeRw":12288,
-      # "SizeRootFs":0
+      def status_str()     @info['Status']  ; end
 
       FIXUP_NAME_RE = %r{^/}
       def names()
@@ -42,8 +43,12 @@ module Rucker
         end
       end
 
+
+      # ===========================================================================
       #
-      # The next set of attributes require an extra call to get the detailed info
+      # Extended Properties
+      #
+       # ext_info attributes require an extra call to get the detailed info
       #
 
       # Memoized request for detailed values
@@ -53,15 +58,21 @@ module Rucker
         @ext_info = { 'NetworkSettings' => {}, 'Config' => {}, 'HostConfig' => {}, 'State' => {} }
       end
 
-      def hostname()        ext_info['Hostname'] ;  end
-      def ip_address()      ext_info['NetworkSettings']['IPAddress'] ;  end
-      def image_id()        ext_info['Image']               ; end
+      # Remove memoized last-seen info so that future calls will force a fetch
+      def forget
+        remove_instance_variable :@ext_info if instance_variable_defined?(:@ext_info)
+        return self
+      end
+
+      def hostname()            ext_info['Hostname'] ;  end
+      def ip_address()          ext_info['NetworkSettings']['IPAddress'] ;  end
+      def image_id()            ext_info['Image']               ; end
       # As requested at config time
       def conf_image_repo_tag() ext_info['Config']['Image'] ; end
-      def conf_volumes()    ext_info['Config']['Volumes'].keys   || Array.new rescue Array.new ; end
-      def volumes_from()    ext_info['HostConfig']['VolumesFrom'] || Array.new ; end
+      def conf_volumes()        ext_info['Config']['Volumes'].keys   || Array.new rescue Array.new ; end
+      def volumes_from()        ext_info['HostConfig']['VolumesFrom'] || Array.new ; end
       # runtime ing
-      def exit_code()       ext_info['State']['ExitCode']   ; end
+      def exit_code()           ext_info['State']['ExitCode']   ; end
       def started_at()
         tm = ext_info['State']['StartedAt']
         (tm == '0001-01-01T00:00:00Z' ? nil : tm)
@@ -73,13 +84,10 @@ module Rucker
       end
       # also: ghost, pid
 
-      FIXUP_LINK_NAME_RE = %r{^.*/(.*?):.*}
-      # Containers this is linked to (i.e. whose ports can be accessed from this one)
-      # @return [Array[String]] list of container names, with first `/` character removed
-      def links
-        links = ext_info['HostConfig']['Links'] or return Array.new
-        links.map{|link| link.gsub(FIXUP_LINK_NAME_RE, '\1') }
-      end
+      # ===========================================================================
+      #
+      # State info
+      #
 
       # State of the machine: :running, :paused, :restart, :stopped, or :absent
       # @return [:running, :paused, :restart, :stopped, :absent]
@@ -94,10 +102,89 @@ module Rucker
         end
       end
 
-      def absent?() state == :absent  ; end
-      def exists?() not absent?       ; end
-      def up?()     state == :running ; end
-      def ready?() [:running, :paused, :stopped].include?(state) ; end
+      READY_STATES = [ :running, :paused, :restart, :stopped,         ].to_set
+      DOWN_STATES  = [                              :stopped, :absent ].to_set
+      TRANS_STATES = [ :restart                                       ].to_set
+
+      def running?()    state == :running              ; end
+      def transition?() TRANS_STATES.include?(state)   ; end
+      def absent?()     state == :absent               ; end
+      def exists?()     not absent?                    ; end
+
+      def up?()         running?                       ; end
+      def ready?()      READY_STATES.include?(state)   ; end
+      def down?()       DOWN_STATES.include?(state)    ; end
+      def clear?()      absent?                        ; end
+
+      # ===========================================================================
+      #
+      # Actions
+      #
+
+      def self.all(opts={})
+        super({ 'all' => 'True' }.merge(opts))
+      end
+
+      def self.create_using_manifest(ctr)
+        pub_ports = ctr.ports.published_creation_hshs
+        exp_ports = ctr.ports.exposed_creation_hshs
+        vol_spec = {}
+        ctr.volumes.each{|vol| vol_spec[vol.gsub(/:.*/,'')] = Hash.new }
+        raw_create_hsh = {
+          'name'              => ctr.name,
+          'Image'             => ctr.image_repo_tag,
+          'Entrypoint'        => ctr.entrypoint,
+          'Cmd'               => ctr.entry_args,
+          'Hostname'          => ctr.hostname,
+          'Volumes'           => vol_spec,
+          'HostConfig' =>{
+            'Links'           => ctr.links.map(&:to_s), # 'container_name:alias'
+            'Binds'           => ctr.volumes,           # 'path', 'hpath:cpath', 'hpath:cpath:ro'
+            'VolumesFrom'     => ctr.volumes_from,      # ctr_name:ro or ctr_name:rw
+            'RestartPolicy'   => {},                    # or {'Name'=>'always'} or { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
+            'ExposedPorts'    => exp_ports,             # { "<port>/<tcp|udp>: {}" }
+            'PortBindings'    => pub_ports,             # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
+            'PublishAllPorts' => true,
+          }
+        }
+        p raw_create_hsh
+        create(raw_create_hsh)
+      end
+
+      def start_using_manifest(ctr)
+        pub_ports = ctr.ports.published_creation_hshs
+        raw_start_hsh = {
+          'Links'           => ctr.links.map(&:to_s),   # 'container_name:alias'
+          'Binds'           => ctr.volumes,             # 'path', 'hpath:cpath', 'hpath:cpath:ro'
+          'VolumesFrom'     => ctr.volumes_from,        # ctr_name:ro or ctr_name:rw
+          'RestartPolicy'   => {},                      # or {'Name'=>'always'} or  { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
+          'PortBindings'    => pub_ports,               # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
+          'PublishAllPorts' => true,
+        }
+        p raw_start_hsh
+        start!(raw_start_hsh)
+      end
+
+      def stop_using_manifest(ctr)
+        stop()
+      end
+
+      def remove_using_manifest(ctr)
+        remove('v' => 'true')
+      end
+
+      # ===========================================================================
+      #
+      # Non-simple Properties
+      #
+
+      FIXUP_LINK_NAME_RE = %r{^.*/(.*?):.*}
+      # Containers this is linked to (i.e. whose ports can be accessed from this one)
+      # @return [Array[String]] list of container names, with first `/` character removed
+      def links
+        links = ext_info['HostConfig']['Links'] or return Array.new
+        links.map{|link| link.gsub(FIXUP_LINK_NAME_RE, '\1') }
+      end
 
       # Volume status
       # @return [Hash] hash with keys `name`, `path` and `writeable`
@@ -132,67 +219,9 @@ module Rucker
         pbs.uniq
       end
 
-      # Remove memoized last-seen info so that future calls will force a fetch
-      def forget
-        remove_instance_variable :@ext_info if instance_variable_defined?(:@ext_info)
-        return self
-      end
-
       #
       # These things come back for free with the call to .all
       #
-
-      def self.raw_create_hsh(ctr)
-        pub_ports = ctr.ports.published_creation_hshs
-        exp_ports = ctr.ports.exposed_creation_hshs
-        vol_spec = {}
-        ctr.volumes.each{|vol| vol_spec[vol.gsub(/:.*/,'')] = Hash.new }
-        {
-          'name'              => ctr.name,
-          'Image'             => ctr.image_repo_tag,
-          'Entrypoint'        => ctr.entrypoint,
-          'Cmd'               => ctr.entry_args,
-          'Hostname'          => ctr.hostname,
-          'Volumes'           => vol_spec,
-          'HostConfig' =>{
-            'Links'           => ctr.links.map(&:to_s), # 'container_name:alias'
-            'Binds'           => ctr.volumes,           # 'path', 'hpath:cpath', 'hpath:cpath:ro'
-            'VolumesFrom'     => ctr.volumes_from,      # ctr_name:ro or ctr_name:rw
-            'RestartPolicy'   => {},                    # or {'Name'=>'always'} or { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
-            'ExposedPorts'    => exp_ports,             # { "<port>/<tcp|udp>: {}" }
-            'PortBindings'    => pub_ports,             # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
-            'PublishAllPorts' => true,
-          }
-        }
-      end
-
-      def self.create_using_manifest(ctr)
-        create(raw_create_hsh(ctr))
-      end
-
-      def raw_start_hsh(ctr)
-        pub_ports = ctr.ports.published_creation_hshs
-        {
-          'Links'           => ctr.links.map(&:to_s),   # 'container_name:alias'
-          'Binds'           => ctr.volumes,             # 'path', 'hpath:cpath', 'hpath:cpath:ro'
-          'VolumesFrom'     => ctr.volumes_from,        # ctr_name:ro or ctr_name:rw
-          'RestartPolicy'   => {},                      # or {'Name'=>'always'} or  { 'Name' => 'on-failure', 'MaximumRetryCount' => count }
-          'PortBindings'    => pub_ports,               # { <port>/<protocol>: [{ "HostPort": "<port>" }] } -- port is a string
-          'PublishAllPorts' => true,
-        }
-      end
-
-      def self.all(opts={})
-        super({ 'all' => 'True' }.merge(opts))
-      end
-
-      def start_using_manifest(ctr)
-        start!(raw_start_hsh(ctr))
-      end
-
-      def stop_using_manifest(ctr)
-        stop()
-      end
 
       def parse_status_str(str)
         case str

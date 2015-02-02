@@ -6,9 +6,10 @@ MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 EXPOSE 50090
 EXPOSE 50490
 
+COPY img/hadoop_snn/hadoop-setup_snn.sh /build/
+
 # Install and configure the secondarynamenode
 #
-COPY img/hadoop_snn/hadoop-setup_snn.sh /build/
 RUN          /build/hadoop-setup_snn.sh
 
 # Ensures Hadoop directories are happy and permissioned even if we mount something under them.

@@ -16,7 +16,7 @@ $safe_apt_install oracle-java7-installer oracle-java7-set-default
 
 echo "**********" ; du --exclude=proc -smc /
 
-rm /var/cache/oracle-jdk7-installer/jdk-7u72-linux-x64.tar.gz
+rm /var/cache/oracle-jdk7-installer/jdk-*-linux-x64.tar.gz
 apt-get clean
 
 echo "**********" ; du --exclude=proc -smc /

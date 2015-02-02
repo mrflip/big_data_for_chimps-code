@@ -6,9 +6,12 @@ MAINTAINER Flip Kromer <flip@infochimps.com>, Russell Jurney
 EXPOSE 50070
 EXPOSE 8020
 
+COPY img/hadoop_nn/hadoop-setup_nn.sh       \
+     img/hadoop_nn/hadoop-bootstrap_hdfs.sh \
+     /build/
+
 # Install and configure the namenode
 #
-COPY img/hadoop_nn/hadoop-setup_nn.sh /build/
 RUN         /build/hadoop-setup_nn.sh
 
 # Ensures Hadoop directories are happy and permissioned even if we mount something under them.
@@ -25,6 +28,5 @@ RUN  \
 
 # Format the HDFS and make initial directories
 #
-COPY img/hadoop_nn/hadoop-bootstrap_hdfs.sh /build/
 RUN         /build/hadoop-bootstrap_hdfs.sh
 

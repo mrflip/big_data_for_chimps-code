@@ -15,21 +15,22 @@ EXPOSE 8042
 # # tasktracker: 50060 console
 # EXPOSE 50060
 
+COPY img/hadoop_worker/hadoop-setup_dn.sh \
+     img/hadoop_worker/hadoop-setup_nm.sh \
+     img/hadoop_worker/hadoop-setup_tt.sh \
+     /build/
+
 # Install and configure the datanode
 #
-COPY img/hadoop_worker/hadoop-setup_dn.sh /build/
 RUN             /build/hadoop-setup_dn.sh
-
-# # Install and configure the tasktracker
-# #
-# #
-# COPY img/hadoop_worker/hadoop-setup_tt.sh /build/
-# RUN             /build/hadoop-setup_tt.sh
 
 # Install and configure the nodemanager
 #
-COPY img/hadoop_worker/hadoop-setup_nm.sh /build/
 RUN             /build/hadoop-setup_nm.sh
+
+# # Alternatively: Install and configure the tasktracker
+# #
+# RUN             /build/hadoop-setup_tt.sh
 
 # Ensures Hadoop directories are happy and permissioned even if we mount something under them.
 COPY img/hadoop_worker/conf/init-hadoop_worker_fixup.sh /etc/my_init.d/30_hadoop_worker_fixup.sh

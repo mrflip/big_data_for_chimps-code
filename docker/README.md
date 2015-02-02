@@ -1,4 +1,8 @@
 
+
+	cd /Users/flip/ics/book/big_data_for_chimps/examples/docker/
+	ORG=bd4c ; for foo in $ORG/baseimage $ORG/hadoop_base $ORG/hadoop_nn $ORG/hadoop_snn $ORG/hadoop_lounge $ORG/hadoop_hue $ORG/hadoop_rm $ORG/hadoop_worker $ORG/hadoop_lounge hloc_builder ; do ; ln -snf ./img/`basename $foo`/Dockerfile ./Dockerfile && docker build -t $foo . || break ; done
+
 ### Install decking
 
 Clusters are defined using [decking](http://decking.io), a Node.js tool to create, manage and run clusters of Docker containers, as well as some rake scripts we've assembled.
@@ -54,7 +58,6 @@ docker --rm --name hdp -i -t hadoop-client
 The data files are managed as a [Data Volume Container](https://docs.docker.com/userguide/dockervolumes/).
 
 sudo docker run -d -v /dbdata --name dbdata training/postgres echo Data-only container for postgres
-
 
 sudo docker run -d --volumes-from dbdata --name db1 training/postgres
 

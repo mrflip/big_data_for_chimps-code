@@ -32,6 +32,10 @@ $safe_apt_install                                                 \
   libssl-dev  libxml2-dev libxml2-dev libxml2-utils libxslt-dev   \
   libxslt1-dev libxslt1-dev libyaml-dev libyaml-dev zlib1g-dev
 
+du --exclude=proc -smc / ; echo "======== java"
+
+$safe_apt_install                                                 \
+        ant maven2 scala 
 
 du --exclude=proc -smc / ; echo "======== python"
 

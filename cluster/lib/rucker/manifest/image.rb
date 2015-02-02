@@ -2,6 +2,8 @@
 module Rucker
   module Manifest
     class Image < Rucker::Manifest::Base
+      include Rucker::HasGoals
+      #
       field :name,        :string,  doc: "Symbolic name for this image. *Not* the reg/repo/slug:tag."
       field :repo_tag,    :string,  doc: "Full name -- reg/repo/slug:tag -- for image. Registry and Tag optional"
       field :external,    :boolean, doc: 'Is this one of your images, i.e. it should be included in a push or build?'
@@ -11,8 +13,17 @@ module Rucker
       accessor_field :actual, Rucker::Actual::DockerImage, writer: true
       # protected :actual
       accessor_field :parsed_repo_tag
+
+      # ===========================================================================
       #
-      class_attribute :max_retries; self.max_retries = 10
+      # Delegated Properties
+      #
+
+      # @see Rucker::Actual::DockerImage#id
+      # @return [String] ID for this image as a long hexadecimal string
+      def id()         actual.try(:id) || ''  ; end
+      # @return [String] ID for this image as a 13-character hexadecimal string
+      def short_id()   id[0..12]              ; end
 
       # An image can have multiple tags -- for example, `library/debian:stable` and
       # `library/debian:jessie` are currently identical.
@@ -20,12 +31,6 @@ module Rucker
       # @see Rucker::Actual::DockerImage#repo_tags
       # @return [Array[String]] All repo_tag that have the same final layer as this image
       def repo_tags()  actual.try(:repo_tags) || [] ; end
-
-      # @see Rucker::Actual::DockerImage#id
-      # @return [String] ID for this image as a long hexadecimal string
-      def id()         actual.try(:id) || ''  ; end
-      # @return [String] ID for this image as a 13-character hexadecimal string
-      def short_id()   id[0..12]              ; end
 
       # @see Rucker::Actual::DockerImage#created_at
       # @return [Time] Creation time of this image
@@ -45,65 +50,64 @@ module Rucker
         "%4d %2s" % Rucker.bytes_to_human(size) rescue ''
       end
 
+      # ===========================================================================
+      #
+      # States
+      #
 
-      # Clears any cached information this object might have
-      # @return self
-      def forget()
-        unset_parsed_repo_tag
+      def state()
+        actual_or(:state, :absent)
       end
 
+      def transition?() actual_or(:transition?, false) ; end
+      def absent?()     actual_or(:absent?, true)      ; end
+      def exists?()     not absent?                    ; end
+
+      def up?()         actual_or(:up?,     false)     ; end
+      def ready?()      actual_or(:ready?,  false)     ; end
+      def down?()       actual_or(:down?,   true)      ; end
+      def clear?()      actual_or(:clear?,  true)      ; end
+
+      # ===========================================================================
+      #
+      # Goals
+      #
+
+      before :up do
+        [ [self, :ready] ]
+      end
+
+      goal :up do
+        # ready is the same as up
+        return RuntimeError.new("Should not advance to :up from state #{state} -- #{self}")
+      end
+
+      goal :ready do
+        pull!
+        return :pull!
+      end
+
+      goal :down do
+        # exists and absent are both down
+      end
+
+      before :clear do
+        [ [self, :down] ]
+      end
+
+      goal :clear do
+        remove!
+        return :remove!
+      end
+
+      # ===========================================================================
       #
       # Actions
       #
 
-      def up?()     exists? ; end
-      def ready?()  exists? ; end
-      def down?()   absent? ; end
-      def clear?()  absent? ; end
-
-      def at_goal?(goal) self.send("#{goal}?") ; end
-
-      def exists?() state == :exists ; end
-      def absent?() state == :absent ; end
-
-      def ready(*args) invoke_until_satisfied(:ready, *args) ; end
-      def clear(*args) invoke_until_satisfied(:clear, *args) ; end
-
-      def _ready
-        case state
-        when :exists  then            return true
-        when :absent  then _pull    ; return false # wait for pull
-        else                          return false # don't know, hope we figure it out.
-        end
-      end
-
-      def _clear
-        case state
-        when :exists  then _remove  ; return false # wait for remove
-        when :absent  then          ; return true
-        else                          return false # don't know, hope we figure it out.
-        end
-      end
-
-      # note that a manifest object is not created for the new image, let alone
-      # added to the world manifest.
-      def add_tag(opts={})
+      def pull!(opts={})
         rt = self.adjusted_name(opts.slice(:reg, :repo, :tag))
-        #
-        if actual.has_repo_tag?(rt[:repo_tag])
-          Rucker.progress(:tagging, self, with: rt[:repo_tag], skipped: "repo_tag #{rt[:repo_tag]} already present")
-          return true
-        end
-        Rucker.progress(:tagging, self, with: rt[:repo_tag])
-        actual.tag(repo: rt[:family], tag: rt[:tag])
-        true
-      end
-
-      def _pull(opts={})
-        rt = self.adjusted_name(opts.slice(:reg, :repo, :tag))
-        #
         creds = Rucker::Manifest::World.authenticate!(rt[:registry])
-        p [rt, creds]
         #
         Rucker.progress(:pulling, self, from: rt[:repo_tag], as: self.repo_tag, note: "This can take a really long time.")
         actual = Rucker::Actual::DockerImage.pull_by_name(
@@ -118,6 +122,14 @@ module Rucker
         true
       end
 
+      def remove!
+        Rucker.progress(:removing, self)
+        actual.untag(self.repo_tag)
+        forget()
+        self.actual = nil
+        true
+      end
+
       def push(repo_tag=nil)
         if repo_tag.present?
           name_hsh = Docker.parse_reg_repo_tag(repo_tag)
@@ -125,6 +137,20 @@ module Rucker
           name_hsh = self.parsed_repo_tag
         end
         _push(name_hsh.slice(:reg, :repo, :slug, :tag))
+      end
+
+      # note that a manifest object is not created for the new image, let alone
+      # added to the world manifest.
+      def add_tag(opts={})
+        rt = self.adjusted_name(opts.slice(:reg, :repo, :tag))
+        #
+        if actual.has_repo_tag?(rt[:repo_tag])
+          Rucker.progress(:tagging, self, with: rt[:repo_tag], skipped: "repo_tag #{rt[:repo_tag]} already present")
+          return true
+        end
+        Rucker.progress(:tagging, self, with: rt[:repo_tag])
+        actual.tag(repo: rt[:family], tag: rt[:tag])
+        true
       end
 
       #
@@ -195,106 +221,10 @@ module Rucker
         hsh
       end
 
-      PROGRESS_BAR_RE = %r{\[([^\]])\] ([\d\.]+) (\w\w)/([\d\.]+) (\w\w) (\w+)}
-      PROGRESS_MUTING = 0.1
-
-      def interpret_chunk(step, actual)
-        case step['status']
-        when /^(Pushing|Pulling) repository ([^\s]+)(?: \((\d+) tags\))?/
-          Rucker.progress(($1.downcase.to_sym), self, from: $2)
-        when /^Pulling image \((.*)\) from (.*)/
-          Rucker.progress(:downloading, self, layer: step['id'], from: $2)
-        when /Sending image list/
-          Rucker.progress(:preparing, self, as: 'list of layers')
-        when /^(Pushing|Downloading)\z/
-          if step['progress']
-            Rucker.progress(:bored_now, self, progress: step['progress'], mute: PROGRESS_MUTING)
-          end
-        when /^Buffering|The push refers to a repository|Pulling metadata|Pulling fs layer|Pulling dependent layers/
-          # pass
-        when /^Extracting|The image you are pulling has been verified/
-          # pass
-        when /^Image (?:([^ ]+) )?already pushed, skipping/
-          Rucker.progress(:sending, self, layer: step['id'] || $1 || step.to_s,
-            skipped: 'layer already pushed', mute: 0.1)
-        when /^Already exists/
-          Rucker.progress(:downloaded, self, layer: step['id'] || step.to_s,
-            skipped: 'layer already exists', mute: 1.0)
-        when /^Image successfully pushed/
-          Rucker.progress(:sent,    self, layer: step['id'])
-        when /^(Download|Pull) complete/
-          Rucker.progress(("#{$1}ed".downcase.to_sym), self, layer: step['id'])
-        when /^Pushing tag for rev \[([^\]]+)\] on \{([^\}]+)/
-          Rucker.progress(:tagged,  self, layer: $1, as: $2)
-        when /^Status: (Downloaded newer image|Image is up to date) for (.+)/
-          Rucker.progress(:pulled,  self)
-        else
-          Rucker.progress(:unknown, self, step: step.inspect)
-        end
-      end
-
-      def _remove
-        Rucker.progress(:removing, self)
-        actual.untag(self.repo_tag)
-        forget()
-        self.actual = nil
-        true
-      end
-
+      # ===========================================================================
       #
-      # State Handling
+      # Mechanics
       #
-
-      def refresh!
-        forget()
-        if self.actual.present?
-          self.actual.refresh!
-        else
-          self.actual = Rucker::Actual::DockerImage.get(repo_tag)
-        end
-        self
-      rescue Docker::Error::NotFoundError => err
-        self.actual = nil
-        self
-      end
-
-      def state
-        case
-        when actual.blank? then :absent
-        else                    :exists
-        end
-      end
-
-      def state_desc
-        states = Array.wrap(state)
-        case
-        when states == []       then "missing anything to report state of"
-        when states.length == 1 then states.first.to_s
-        else
-          fin = states.pop
-          "a mixture of #{states.join(', ')} and #{fin} states"
-        end
-      end
-
-      def invoke_until_satisfied(operation, *args)
-        forget
-        max_retries.times do |idx|
-          begin
-            Rucker.output("#{operation} -> single #{desc} (#{state_desc}) #{idx > 1 ? " (#{idx})" : ''}")
-            success = self.public_send("_#{operation}", *args)
-            return true if success
-          rescue Docker::Error::NotFoundError => err
-            Rucker.warn "Missing image in #{operation} -> #{name}: #{err}; skipping"
-            refresh!
-            return false
-          rescue Docker::Error::DockerError => err
-            Rucker.warn "Problem with #{operation} -> #{name}: #{err}"
-            sleep 2
-          end
-          refresh!
-        end
-        Rucker.die "Could not bring #{self.inspect_compact} to #{operation} after #{max_retries} attempts. Dying."
-      end
 
       #
       # Repo_Tag handling
@@ -325,14 +255,77 @@ module Rucker
       # @example images.items.sort_by(&:repo_tag_order)
       def repo_tag_order() Rucker.repo_tag_order(name) ; end
 
+      # Clears any cached information this object might have
+      # @return self
+      def forget()
+        unset_parsed_repo_tag
+      end
+
       def to_wire(*)
         super
           .tap{|hsh| hsh.delete(:_type) }
           .merge(:_actual => actual.try(:to_wire))
       end
+
+      # #
+      # # State Handling
+      # #
+      #
+      # def refresh!
+      #   forget()
+      #   if self.actual.present?
+      #     self.actual.refresh!
+      #   else
+      #     self.actual = Rucker::Actual::DockerImage.get(repo_tag)
+      #   end
+      #   self
+      # rescue Docker::Error::NotFoundError => err
+      #   self.actual = nil
+      #   self
+      # end
+      #
+      # def state
+      #   case
+      #   when actual.blank? then :absent
+      #   else                    :exists
+      #   end
+      # end
+      #
+      # def state_desc
+      #   states = Array.wrap(state)
+      #   case
+      #   when states == []       then "missing anything to report state of"
+      #   when states.length == 1 then states.first.to_s
+      #   else
+      #     fin = states.pop
+      #     "a mixture of #{states.join(', ')} and #{fin} states"
+      #   end
+      # end
+      #
+      # def invoke_until_satisfied(operation, *args)
+      #   forget
+      #   max_retries.times do |idx|
+      #     begin
+      #       Rucker.output("#{operation} -> single #{desc} (#{state_desc}) #{idx > 1 ? " (#{idx})" : ''}")
+      #       success = self.public_send("_#{operation}", *args)
+      #       return true if success
+      #     rescue Docker::Error::NotFoundError => err
+      #       Rucker.warn "Missing image in #{operation} -> #{name}: #{err}; skipping"
+      #       refresh!
+      #       return false
+      #     rescue Docker::Error::DockerError => err
+      #       Rucker.warn "Problem with #{operation} -> #{name}: #{err}"
+      #       sleep 2
+      #     end
+      #     refresh!
+      #   end
+      #   Rucker.die "Could not bring #{self.inspect_compact} to #{operation} after #{max_retries} attempts. Dying."
+      # end
     end
 
     class ImageCollection < Rucker::KeyedCollection
+      include Rucker::CollectsGoals
+      #
       self.item_type = Rucker::Manifest::Image
 
       def desc
@@ -357,7 +350,6 @@ module Rucker
       #
       def ready?() items.all?(&:ready?) ; end
       def clear?() items.all?(&:clear?) ; end
-
 
       ::Rucker.module_eval do
         def self.parallelize(coll, operation, num_threads, mutex, opts, &callback)
@@ -415,7 +407,6 @@ module Rucker
       #
 
       # collection of images with given family, sorted by value
-      # @see
       def select_coll(&blk)
         coll = new_empty_collection
         clxn.values.
