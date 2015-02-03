@@ -24,7 +24,10 @@ RUN             /build/hadoop-setup_datafu.sh
 COPY img/hadoop_lounge/conf/pig/* $PIG_HOME/conf/
 
 RUN \
-  mkdir /data/{out,gold,work,ripd}
+  mkdir -p /data/out /data/gold /data/work /data/ripd && \
+  chown -R chimpy:admin /data/ && \
+  chmod -R ug+rw        /data/ && \
+  ls -l    /data/
 
 # ENV  LIPSTICK_DIR           /usr/local/lipstick
 # ENV  LIPSTICK_CONSOLE_LIBS  $LIPSTICK_DIR/lipstick-console/build/libs

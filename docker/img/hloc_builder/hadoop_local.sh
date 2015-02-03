@@ -10,8 +10,8 @@ HLOC_IMG=${HLOC_IMG-bd4c/hadoop_local}
 # launch an interactive shell.
 
 exec docker run -it                       \
-       --name "$HLOC_NAME"                \
+       --name hadoop_local                \
        -u chimpy -w /home/chimpy          \
        -e HOME=/home/chimpy -e TERM=$TERM \
-       "$HLOC_IMG"                        \
+       bd4c/hadoop_local                  \
        /bin/bash -l

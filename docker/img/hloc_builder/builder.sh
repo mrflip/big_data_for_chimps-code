@@ -4,29 +4,30 @@ set -v ; set -e
 
 # ORG=bd4c ; for foo in $ORG/hadoop_lounge hloc_builder ; do ln -snf ./img/`basename $foo`/Dockerfile ./Dockerfile && docker build -t $foo . || break ; done
 
-docker run -d --name hloc_data                           \
-       -v /mounted/data_gold                             \
-       bd4c/data_gold                                    \
-       pushpull /mounted/data_gold
-
-docker run -d --name hloc_home                           \
-       -v /mounted/home_chimpy                           \
-       bd4c/home_chimpy                                  \
-       pushpull /mounted/home_chimpy
+# docker run -d --name hloc_data                           \
+#        -v /shared/data/gold:/shared/data/gold                             \
+#        bd4c/data_gold                                    \
+#        pushpull /shared/data/gold
+# 
+# docker run -d --name hloc_home                           \
+#        -v /shared/home/chimpy                           \
+#        bd4c/home_chimpy                                  \
+#        pushpull /shared/home/chimpy
 
 docker run -d --name hloc_builder --publish 10022:22     \
-       --volumes-from hloc_data --volumes-from hloc_home \
+       -v /shared/data/gold:/shared/data/gold            \
+       -v /shared/home/chimpy:/shared/home/chimpy        \
        hloc_builder
 
 sleep 4
 
-ssh -i ../cluster/insecure_key.pem -p 10022 root@localhost  'mkdir -p /data/gold && rsync -rlOvit /mounted/data_gold/   /data/gold/   && chown -R chimpy:admin /data/gold    && chmod -R ug+rw /data/gold'
+ssh -i ../cluster/insecure_key.pem -p 10022 root@localhost  'mkdir -p /data/gold && rsync -rlOvit /shared/data/gold/   /data/gold/   && chown -R chimpy:admin /data/gold    && chmod -R ug+rw /data/gold'
 
 # docker diff hloc_builder | egrep    '^../data/gold'   | cut -d/ -f1-4 | sort | uniq -c
 
 docker commit -m "Copying /data/gold"  hloc_builder bd4c/hadoop_local
 
-ssh -i ../cluster/insecure_key.pem -p 10022 root@localhost  '                       rsync -rlOvit /mounted/home_chimpy/ /home/chimpy/ && chown -R chimpy       /home/chimpy'
+ssh -i ../cluster/insecure_key.pem -p 10022 root@localhost  '                       rsync -rlOvit /shared/home/chimpy/ /home/chimpy/ && chown -R chimpy       /home/chimpy'
 
 docker diff hloc_builder | egrep -v '^../(data/gold|home/chimpy)'
 docker diff hloc_builder | egrep    '^../home/chimpy' | cut -d/ -f1-4 | sort | uniq -c
