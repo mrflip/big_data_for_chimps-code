@@ -1,8 +1,3 @@
-REGISTER /usr/lib/pig/datafu.jar
-
--- Find distinct tuples based on the 0th (first) key
-DEFINE DistinctByYear datafu.pig.bags.DistinctBy('1');
-
 bat_seasons = LOAD '/data/gold/sports/baseball/bat_seasons.tsv' USING PigStorage('\t') AS (
     player_id:chararray, name_first:chararray, name_last:chararray,     --  $0- $2
     year_id:int,        team_id:chararray,     lg_id:chararray,         --  $3- $5
@@ -10,87 +5,90 @@ bat_seasons = LOAD '/data/gold/sports/baseball/bat_seasons.tsv' USING PigStorage
     H:int,    h1B:int,  h2B:int,  h3B:int, HR:int,   R:int,    RBI:int  -- $13-$19
 );
 
-bat_seasons = FOREACH bat_seasons GENERATE 
-    player_id, 
+
+players_PA = FOREACH bat_seasons GENERATE 
+    team_id, 
     year_id, 
-    team_id;
+    player_id, 
+    name_first, 
+    name_last, 
+    PA;
 
-player_teams = FOREACH (GROUP bat_seasons BY player_id) {
-    sorted = ORDER bat_seasons.(team_id, year_id) BY year_id;
-    distinct_by_year = DistinctByYear(sorted);
+team_playerslist_by_PA = FOREACH (GROUP players_PA BY (team_id, year_id)) {
+    players_o_1 = ORDER players_PA BY PA DESC, player_id;
+    players_o = LIMIT players_o_1 4;
     GENERATE 
-        group AS player_id, 
-        BagToString(distinct_by_year, '|');
+        group.team_id, 
+        group.year_id,
+        players_o.(player_id, name_first, name_last, PA) AS players_o;
 };
 
-dump @;
-
-/*
-(zupcibo01,BOS|1991|BOS|1992|BOS|1993|CHA|1994)
-(zuvelpa01,ATL|1982|ATL|1983|ATL|1984|ATL|1985|NYA|1986|NYA|1987|CLE|1988|CLE|1989)
-(zuverge01,DET|1954|BAL|1955|BAL|1956|BAL|1957|BAL|1958)
-(zwilldu01,CHA|1910|CHF|1914|CHF|1915|CHN|1916)
-*/
-
-
--- Constructing a Sequence of Sets
-sig_seasons = FILTER bat_seasons BY 
-    ((year_id >= 1900) AND 
-    (lg_id == 'NL' OR lg_id == 'AL') AND 
-    (PA >= 450));
-
-y1 = FOREACH sig_seasons GENERATE player_id, team_id, year_id;
-y2 = FOREACH sig_seasons GENERATE player_id, team_id, year_id;
-
--- Put each team of players in context with the next year's team of players
-year_to_year_players = COGROUP
-    y1 BY (team_id, year_id),
-    y2 BY (team_id, year_id-1)
-;
-
--- Clear away the grouped-on fields
-rosters = FOREACH year_to_year_players GENERATE
-    group.team_id AS team_id,
-    group.year_id AS year_id,
-    y1.player_id  AS pl1,
-    y2.player_id  AS pl2
-;
-
--- The first and last years of existence don't have anything interesting to compare, so reject them.
-rosters = FILTER rosters BY (COUNT_STAR(pl1) == 0L OR COUNT_STAR(pl2) == 0L);
-
-
--- Set Union and Intersection
-DEFINE SetUnion datafu.pig.sets.SetUnion();
-DEFINE SetIntersect datafu.pig.sets.SetIntersect();
-DEFINE SetDifference datafu.pig.sets.SetDifference();
-
-roster_changes_y2y = FOREACH rosters {
-    -- Distinct Union (doesn't need pre-sorting)
-    either_year  = SetUnion(pl1, pl2);
-    -- The other operations require sorted bags.
-    pl1_o = ORDER pl1 BY player_id;
-    pl2_o = ORDER pl2 BY player_id;
-
-    -- Set Intersection
-    stayed      = SetIntersect(pl1_o, pl2_o);
-    -- Set Difference
-    y1_departed = SetDifference(pl1_o, pl2_o);
-    y2_arrived  = SetDifference(pl2_o, pl1_o);
-    -- Symmetric Difference
-    non_stayed = SetUnion(y1_departed, y2_arrived);
-    -- Set Equality
-    is_equal    = ( (COUNT_STAR(non_stayed) == 0L) ? 1 : 0);
-
+team_playerslist_by_PA_2 = FOREACH team_playerslist_by_PA {
+    -- will not have same order, even though contents will be identical
+    disordered    = DISTINCT players_o;
+    -- this ORDER BY does _not_ come for free, though it's not terribly costly
+    alt_order     = ORDER players_o BY player_id;
+    -- these are all iterative and so will share the same order of descending PA
+    still_ordered = FILTER players_o BY PA > 10;
+    pa_only       = players_o.PA;
+    pretty        = FOREACH players_o GENERATE
+        StringConcat((chararray)PA, ':', name_first, ' ', name_last);
     GENERATE 
-        year_id, 
-        team_id,
-        either_year, 
-        stayed, 
-        y1_departed, 
-        y2_arrived, 
-        non_stayed, 
-        is_equal;
+        team_id, 
+        year_id,
+        disordered, 
+        alt_order,
+        still_ordered, 
+        pa_only, 
+        BagToString(pretty, '|');
 };
 
-DUMP @;
+
+-- Top 20 Player Seasons by Hits
+sorted_seasons = ORDER bat_seasons BY H DESC;
+top_20_seasons = LIMIT sorted_seasons 20;
+
+
+-- Top 5 players per season by RBIs
+top_5_per_season = FOREACH (GROUP bat_seasons BY year_id) GENERATE 
+    group AS year_id, 
+    TOP(5,19,bat_seasons) AS top_5; -- 19th column is RBIs (start at 0)
+
+-- Note - you can achieve the same with:
+top_5_per_season = FOREACH (GROUP bat_seasons BY year_id) {
+    sorted = ORDER bat_seasons BY RBI DESC;
+    top_5 = LIMIT sorted 5;
+    ascending = ORDER top_5 BY RBI;
+    GENERATE 
+        group AS year_id,
+        ascending AS top_5;
+};
+
+
+-- Rank records
+ranked_seasons = RANK bat_seasons; 
+ranked_rbi_seasons = RANK bat_seasons BY 
+    RBI DESC, 
+    H DESC, 
+    player_id;
+ranked_hit_dense = RANK bat_seasons BY
+    H DESC DENSE;
+
+
+-- Finding the Record with the Max Value:
+--
+-- For each season by a player, select the team they played the most games for.
+-- In SQL, this is fairly clumsy (involving a self-join and then elimination of
+-- ties) In Pig, we can ORDER BY within a foreach and then pluck the first
+-- element of the bag.
+top_stint_per_player_year = FOREACH (GROUP bat_seasons BY (player_id, year_id)) {
+    sorted = ORDER bat_seasons BY RBI DESC;
+    top_stint = LIMIT sorted 1;
+	stints = COUNT_STAR(bat_seasons);
+    GENERATE 
+        group.player_id, 
+        group.year_id, 
+		stints AS stints,
+        FLATTEN(top_stint.(team_id, RBI)) AS (team_id, RBI);
+};
+multiple_stints = FILTER top_stint_per_player_year BY stints > 1;
