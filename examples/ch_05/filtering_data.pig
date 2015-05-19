@@ -1,3 +1,5 @@
+DEFINE LENGTH org.apache.pig.piggybank.evaluation.string.LENGTH();
+
 -- Load the events that make up baseball games
 bats = LOAD '/data/gold/sports/baseball/events_lite.tsv.bz2' AS (
     game_id:chararray, event_seq:int, year_id:int, game_date:chararray,
@@ -39,8 +41,10 @@ people = LOAD '/data/gold/sports/baseball/people.tsv' USING PigStorage('\t') AS 
     retro_id:chararray,    bbref_id:chararray
 );
 
+people = FOREACH people GENERATE StringConcat(birth_city, ',', birth_state, ',', birth_country) AS birth_place, *;
+
 -- People with known birth year/place
-borned = FILTER people BY (birth_year IS NOT NULL) AND (birth_place IS NOT NULL);
+borned = FILTER people BY (LENGTH(birth_place) > 2) AND (birth_place IS NOT NULL);
 
 -- Look for players with our co-author's names
 namesakes = FILTER people BY (name_first MATCHES '(?i).*(russ|russell|flip|phil+ip).*');
